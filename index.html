@@ -194,13 +194,13 @@ html, body {
   appearance: none;
   width: 100%;
   cursor: pointer;
-  height: 56px;
+  height: 45px;
   background: transparent;
 }
 
 .slider-wrap input[type="range"]::-webkit-slider-runnable-track {
-  height: 56px;
-  border-radius: 28px;
+  height: 45px;
+  border-radius: 22px;
   background: linear-gradient(
     transparent calc(50% - 3px),
     #ccc       calc(50% - 3px),
@@ -211,10 +211,11 @@ html, body {
 
 .slider-wrap input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 56px;
-  height: 56px;
+  width: 45px;
+  height: 45px;
   margin-top: 0;
-  background: #111;
+  /* visible circle is 28px (62% of 45px); outer ring is transparent but still touchable */
+  background: radial-gradient(circle, #111 62%, transparent 62%);
   border-radius: 50%;
   cursor: pointer;
 }
@@ -226,12 +227,13 @@ html, body {
 }
 
 .slider-wrap input[type="range"]::-moz-range-thumb {
-  width: 56px;
-  height: 56px;
+  width: 28px;
+  height: 28px;
   background: #111;
   border-radius: 50%;
   border: none;
   cursor: pointer;
+  /* Firefox doesn't support radial-gradient hitbox trick; 28px visual is close enough */
 }
 
 .tick-row {
