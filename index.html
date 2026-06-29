@@ -99,7 +99,7 @@ html, body {
 
 /* ── Divider / generate row ── */
 #divider-box {
-  height: 96px;
+  height: 76px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -129,7 +129,7 @@ html, body {
 #generate-btn {
   flex: 1;
   max-width: 148px;
-  height: 80px;
+  height: 60px;
   margin: 0 10px;
   background: #111;
   color: #fff;
@@ -190,10 +190,43 @@ html, body {
 }
 
 .slider-wrap input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   cursor: pointer;
-  accent-color: #111;
   height: 44px;
+  background: transparent;
+}
+
+.slider-wrap input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.slider-wrap input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 48px;
+  height: 44px;
+  margin-top: -19px;
+  background: #111;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.slider-wrap input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.slider-wrap input[type="range"]::-moz-range-thumb {
+  width: 48px;
+  height: 44px;
+  background: #111;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
 }
 
 .tick-row {
