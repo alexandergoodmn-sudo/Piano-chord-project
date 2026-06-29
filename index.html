@@ -440,7 +440,8 @@ const VF = Vex.Flow;
 
 function staffWidth() {
   const el = document.getElementById('notation');
-  return Math.min(el.parentElement.clientWidth - 16, 330);
+  const base = Math.min(el.parentElement.clientWidth - 16, 330);
+  return state.numMeasures === 4 ? Math.round(base * 0.86) : base;
 }
 
 // chords: array of chord objects for one measure; duration: VexFlow duration string
