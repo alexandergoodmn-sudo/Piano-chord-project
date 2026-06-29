@@ -302,6 +302,17 @@ html, body {
       </div>
       <span class="slider-current" id="onsets-val">1</span>
     </div>
+    <div class="slider-row">
+      <input type="checkbox" id="lock-density" title="Lock this value">
+      <span class="slider-name">Density</span>
+      <div class="slider-wrap">
+        <input type="range" id="density-range" min="1" max="5" step="1" value="3">
+        <div class="tick-row">
+          <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+        </div>
+      </div>
+      <span class="slider-current" id="density-val">3</span>
+    </div>
   </div>
 
 </div>
@@ -313,17 +324,37 @@ html, body {
 // MUSIC ENGINE
 // ────────────────────────────────────────────────────────────
 
-// C major diatonic triads with grand-staff voicings.
-// Treble: root/3rd/5th in octave 4-5.  Bass: root in octave 2-3.
+// C major diatonic chords. v[0..4] = voicings for density 1-5.
+// density 1=root, 2=root+5th, 3=triad, 4=7th chord, 5=9th chord (rootless treble)
 const CHORDS = [
-  { name: 'C',    roman: 'I',    treble: ['c/4','e/4','g/4'], bass: ['c/3'] },
-  { name: 'Dm',   roman: 'ii',   treble: ['d/4','f/4','a/4'], bass: ['d/3'] },
-  { name: 'Em',   roman: 'iii',  treble: ['e/4','g/4','b/4'], bass: ['e/3'] },
-  { name: 'F',    roman: 'IV',   treble: ['f/4','a/4','c/5'], bass: ['f/3'] },
-  { name: 'G',    roman: 'V',    treble: ['g/4','b/4','d/5'], bass: ['g/2'] },
-  { name: 'Am',   roman: 'vi',   treble: ['a/4','c/5','e/5'], bass: ['a/2'] },
-  { name: 'B°', roman: 'vii°', treble: ['b/4','d/5','f/5'], bass: ['b/2'] },
+  { name: 'Cmaj7', roman: 'I',
+    v: [['c/4'],['c/4','g/4'],['c/4','e/4','g/4'],['c/4','e/4','g/4','b/4'],['e/4','g/4','b/4','d/5']],
+    bass: ['c/3'] },
+  { name: 'Dm7',  roman: 'ii',
+    v: [['d/4'],['d/4','a/4'],['d/4','f/4','a/4'],['d/4','f/4','a/4','c/5'],['f/4','a/4','c/5','e/5']],
+    bass: ['d/3'] },
+  { name: 'Em7',  roman: 'iii',
+    v: [['e/4'],['e/4','b/4'],['e/4','g/4','b/4'],['e/4','g/4','b/4','d/5'],['g/4','b/4','d/5','f/5']],
+    bass: ['e/3'] },
+  { name: 'Fmaj7', roman: 'IV',
+    v: [['f/4'],['f/4','c/5'],['f/4','a/4','c/5'],['f/4','a/4','c/5','e/5'],['a/4','c/5','e/5','g/5']],
+    bass: ['f/3'] },
+  { name: 'G7',   roman: 'V',
+    v: [['g/4'],['g/4','d/5'],['g/4','b/4','d/5'],['g/4','b/4','d/5','f/5'],['b/4','d/5','f/5','a/5']],
+    bass: ['g/2'] },
+  { name: 'Am7',  roman: 'vi',
+    v: [['a/4'],['a/4','e/5'],['a/4','c/5','e/5'],['a/4','c/5','e/5','g/5'],['c/5','e/5','g/5','b/5']],
+    bass: ['a/2'] },
+  { name: 'Bm7b5', roman: 'vii°',
+    v: [['b/4'],['b/4','f/5'],['b/4','d/5','f/5'],['b/4','d/5','f/5','a/5'],['b/4','d/5','f/5','a/5']],
+    bass: ['b/2'] },
 ];
+
+function chordName(chord, density) {
+  if (density <= 2) return chord.roman;
+  if (density === 3) return chord.name.replace('maj7','').replace('m7b5','°').replace('7','');
+  return chord.name;
+}
 
 // Progression templates — indices into CHORDS (C major scale degrees 0-6)
 const PATTERNS = [
@@ -368,6 +399,8 @@ const MEASURE_STOPS = [3, 4, 8];
 const state = {
   numMeasures: 4,
   numOnsets: 1,
+  chordDensity: 3,
+  lockDensity: false,
   lockMeasures: false,
   lockOnsets: false,
   currentIdx: 0,
@@ -386,7 +419,7 @@ function staffWidth() {
 }
 
 // chords: array of chord objects for one measure; duration: VexFlow duration string
-function renderStaff(chords, duration) {
+function renderStaff(chords, duration, density) {
   const container = document.getElementById('notation');
   container.innerHTML = '';
 
@@ -426,7 +459,8 @@ function renderStaff(chords, duration) {
   if (!chords || chords.length === 0) return;
 
   const dur = duration || 'w';
-  const trebleNotes = chords.map(c => new VF.StaveNote({ clef: 'treble', keys: c.treble, duration: dur }));
+  const di = Math.min(Math.max((density || 3), 1), 5) - 1;
+  const trebleNotes = chords.map(c => new VF.StaveNote({ clef: 'treble', keys: c.v[di], duration: dur }));
   const bassNotes   = chords.map(c => new VF.StaveNote({ clef: 'bass',   keys: c.bass,   duration: dur }));
 
   VF.Formatter.FormatAndDraw(ctx, treble, trebleNotes);
@@ -458,8 +492,8 @@ function updateNavButtons() {
 function showMeasure(idx) {
   const chords = state.measures[idx];
   const dur    = durationForOnsets(state.numOnsets);
-  renderStaff(chords, dur);
-  labelEl.textContent   = chords.map(c => c.name).join(' - ');
+  renderStaff(chords, dur, state.chordDensity);
+  labelEl.textContent   = chords.map(c => chordName(c, state.chordDensity)).join(' - ');
   counterEl.textContent = 'Measure ' + (idx + 1) + ' of ' + state.measures.length;
   updateNavButtons();
 }
@@ -499,6 +533,20 @@ onsetsRange.addEventListener('input', function () {
 
 lockOnsetsEl.addEventListener('change', function () {
   state.lockOnsets = this.checked;
+});
+
+const densityRange   = document.getElementById('density-range');
+const densityValEl   = document.getElementById('density-val');
+const lockDensityEl  = document.getElementById('lock-density');
+
+densityRange.addEventListener('input', function () {
+  state.chordDensity = parseInt(this.value);
+  densityValEl.textContent = state.chordDensity;
+  if (state.measures) showMeasure(state.currentIdx);
+});
+
+lockDensityEl.addEventListener('change', function () {
+  state.lockDensity = this.checked;
 });
 
 // ── Init ──────────────────────────────────────────────────────
