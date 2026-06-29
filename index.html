@@ -33,9 +33,9 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   background: #fff;
-  padding: 8px 0 8px;
+  padding: 6px 0 4px;
   border-bottom: 1px solid #ddd;
 }
 
@@ -451,7 +451,9 @@ function renderStaff(measureArr, duration, density) {
   container.innerHTML = '';
 
   const W = staffWidth();
-  const H = 150;
+  const H = 160;
+  const TREBLE_Y = 5;
+  const BASS_Y   = 78;
   const staveX = 16;
   const staveW = W - 20;
   const dur = duration || 'w';
@@ -480,9 +482,9 @@ function renderStaff(measureArr, duration, density) {
 
   if (!twoUp) {
     // ── Single measure ──
-    const treble = new VF.Stave(staveX, 5, staveW).addClef('treble').setContext(ctx);
+    const treble = new VF.Stave(staveX, TREBLE_Y, staveW).addClef('treble').setContext(ctx);
     treble.draw();
-    const bass   = new VF.Stave(staveX, 85, staveW).addClef('bass').setContext(ctx);
+    const bass   = new VF.Stave(staveX, BASS_Y, staveW).addClef('bass').setContext(ctx);
     bass.draw();
     connect(treble, bass, VF.StaveConnector.type.BRACE);
     connect(treble, bass, VF.StaveConnector.type.SINGLE_LEFT);
@@ -493,15 +495,15 @@ function renderStaff(measureArr, duration, density) {
     const halfW = Math.floor(staveW / 2);
     const NONE  = (VF.Barline && VF.Barline.type && VF.Barline.type.NONE) || 7;
 
-    const t1 = new VF.Stave(staveX, 5,  halfW).addClef('treble').setContext(ctx);
+    const t1 = new VF.Stave(staveX, TREBLE_Y, halfW).addClef('treble').setContext(ctx);
     t1.draw();
-    const b1 = new VF.Stave(staveX, 85, halfW).addClef('bass').setContext(ctx);
+    const b1 = new VF.Stave(staveX, BASS_Y, halfW).addClef('bass').setContext(ctx);
     b1.draw();
 
-    const t2 = new VF.Stave(staveX + halfW, 5,  halfW).setContext(ctx);
+    const t2 = new VF.Stave(staveX + halfW, TREBLE_Y, halfW).setContext(ctx);
     t2.setBegBarType(NONE);
     t2.draw();
-    const b2 = new VF.Stave(staveX + halfW, 85, halfW).setContext(ctx);
+    const b2 = new VF.Stave(staveX + halfW, BASS_Y, halfW).setContext(ctx);
     b2.setBegBarType(NONE);
     b2.draw();
 
