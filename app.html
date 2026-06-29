@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Piano Chord Generator</title>
+<script src="https://unpkg.com/vexflow@3.0.9/releases/vexflow-min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  background: #fff;
+  color: #111;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100%;
+}
+
+/* ── Fixed header: staff + divider ── */
+#fixed-top {
+  flex-shrink: 0;
+}
+
+#staff-area {
+  height: 36dvh;
+  min-height: 170px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  padding: 4px 0 2px;
+  border-bottom: 1px solid #ddd;
+  overflow: hidden;
+}
+
+#notation {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#notation svg {
+  display: block;
+  max-width: 100%;
+}
+
+#chord-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #444;
+  min-height: 17px;
+  text-align: center;
+  margin-top: 1px;
+}
+
+#nav-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 3px;
+}
+
+.nav-arrow {
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid #bbb;
+  border-radius: 6px;
+  background: #f6f6f6;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1;
+}
+
+.nav-arrow:active { background: #e0e0e0; }
+.nav-arrow:disabled { opacity: 0.35; cursor: default; }
+
+#measure-counter {
+  font-size: 12px;
+  color: #777;
+  min-width: 100px;
+  text-align: center;
+  letter-spacing: 0.1px;
+}
+
+/* ── Divider / generate row ── */
+#divider-box {
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  background: #f3f3f3;
+  border-top: 1.5px solid #ccc;
+  border-bottom: 1.5px solid #ccc;
+}
+
+.side-btn {
+  min-width: 66px;
+  height: 36px;
+  border: 1.5px solid #bbb;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  color: #333;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0 8px;
+  letter-spacing: 0.2px;
+}
+
+.side-btn:active { background: #e8e8e8; }
+
+#generate-btn {
+  flex: 1;
+  max-width: 148px;
+  height: 60px;
+  margin: 0 10px;
+  background: #111;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#generate-btn:active { background: #333; }
+
+/* ── Scrollable slider area ── */
+#slider-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 16px 28px;
+}
+
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #bbb;
+  margin-bottom: 14px;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.slider-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  cursor: pointer;
+  accent-color: #111;
+}
+
+.slider-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+  min-width: 72px;
+}
+
+.slider-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.slider-wrap input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  cursor: pointer;
+  height: 45px;
+  background: transparent;
+}
+
+.slider-wrap input[type="range"]::-webkit-slider-runnable-track {
+  height: 45px;
+  border-radius: 22px;
+  background: linear-gradient(
+    transparent calc(50% - 3px),
+    #ccc       calc(50% - 3px),
+    #ccc       calc(50% + 3px),
+    transparent calc(50% + 3px)
+  );
+}
+
+.slider-wrap input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 45px;
+  height: 45px;
+  margin-top: 0;
+  /* visible circle is 28px (62% of 45px); outer ring is transparent but still touchable */
+  background: radial-gradient(circle, #111 62%, transparent 62%);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.slider-wrap input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: #ccc;
+  border-radius: 3px;
+}
+
+.slider-wrap input[type="range"]::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  background: #111;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  /* Firefox doesn't support radial-gradient hitbox trick; 28px visual is close enough */
+}
+
+.tick-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 6px;
+}
+
+.tick-row span {
+  font-size: 11px;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.slider-current {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111;
+  min-width: 22px;
+  text-align: right;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="fixed-top">
+    <div id="staff-area">
+      <div id="notation"></div>
+      <div id="chord-label"></div>
+      <div id="nav-row">
+        <button class="nav-arrow" id="prev-btn" disabled>&#8592;</button>
+        <span id="measure-counter">Tap Generate</span>
+        <button class="nav-arrow" id="next-btn" disabled>&#8594;</button>
+      </div>
+    </div>
+    <div id="divider-box">
+      <button class="side-btn" id="genre-btn">Genre</button>
+      <button id="generate-btn">Generate</button>
+      <button class="side-btn" id="mode-btn">Standalone</button>
+    </div>
+  </div>
+
+  <div id="slider-scroll">
+    <div class="section-label">Settings</div>
+    <div class="slider-row">
+      <input type="checkbox" id="lock-measures" title="Lock this value">
+      <span class="slider-name">Measures</span>
+      <div class="slider-wrap">
+        <input type="range" id="measures-range" min="0" max="2" step="1" value="1">
+        <div class="tick-row">
+          <span>3</span><span>4</span><span>8</span>
+        </div>
+      </div>
+      <span class="slider-current" id="measures-val">4</span>
+    </div>
+    <div class="slider-row">
+      <input type="checkbox" id="lock-onsets" title="Lock this value">
+      <span class="slider-name">Onsets</span>
+      <div class="slider-wrap">
+        <input type="range" id="onsets-range" min="1" max="8" step="1" value="1">
+        <div class="tick-row">
+          <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+        </div>
+      </div>
+      <span class="slider-current" id="onsets-val">1</span>
+    </div>
+  </div>
+
+</div>
+<script>
+(function () {
+'use strict';
+
+// ────────────────────────────────────────────────────────────
+// MUSIC ENGINE
+// ────────────────────────────────────────────────────────────
+
+// C major diatonic triads with grand-staff voicings.
+// Treble: root/3rd/5th in octave 4-5.  Bass: root in octave 2-3.
+const CHORDS = [
+  { name: 'C',    roman: 'I',    treble: ['c/4','e/4','g/4'], bass: ['c/3'] },
+  { name: 'Dm',   roman: 'ii',   treble: ['d/4','f/4','a/4'], bass: ['d/3'] },
+  { name: 'Em',   roman: 'iii',  treble: ['e/4','g/4','b/4'], bass: ['e/3'] },
+  { name: 'F',    roman: 'IV',   treble: ['f/4','a/4','c/5'], bass: ['f/3'] },
+  { name: 'G',    roman: 'V',    treble: ['g/4','b/4','d/5'], bass: ['g/2'] },
+  { name: 'Am',   roman: 'vi',   treble: ['a/4','c/5','e/5'], bass: ['a/2'] },
+  { name: 'B°', roman: 'vii°', treble: ['b/4','d/5','f/5'], bass: ['b/2'] },
+];
+
+// Progression templates — indices into CHORDS (C major scale degrees 0-6)
+const PATTERNS = [
+  [0,5,3,4],  // I–vi–IV–V  (pop)
+  [0,3,4,0],  // I–IV–V–I   (classical)
+  [0,4,5,3],  // I–V–vi–IV  (axis)
+  [0,1,4,0],  // I–ii–V–I   (jazz)
+  [5,3,0,4],  // vi–IV–I–V
+  [0,5,1,4],  // I–vi–ii–V
+];
+
+// Maps onset count to VexFlow duration string
+function durationForOnsets(n) {
+  if (n <= 1) return 'w';
+  if (n <= 2) return 'h';
+  if (n <= 4) return 'q';
+  return '8';
+}
+
+// Returns array-of-arrays: measures[m] = [chord, chord, ...]
+function generateProgression(numMeasures, numOnsets) {
+  const pat = PATTERNS[Math.floor(Math.random() * PATTERNS.length)];
+  const measures = [];
+  let eventIdx = 0;
+  for (let m = 0; m < numMeasures; m++) {
+    const measure = [];
+    for (let o = 0; o < numOnsets; o++) {
+      measure.push(CHORDS[pat[eventIdx % pat.length]]);
+      eventIdx++;
+    }
+    measures.push(measure);
+  }
+  return measures;
+}
+
+// ────────────────────────────────────────────────────────────
+// STATE
+// ────────────────────────────────────────────────────────────
+
+const MEASURE_STOPS = [3, 4, 8];
+
+const state = {
+  numMeasures: 4,
+  numOnsets: 1,
+  lockMeasures: false,
+  lockOnsets: false,
+  currentIdx: 0,
+  measures: null, // array of arrays: [[chord,...], ...]
+};
+
+// ────────────────────────────────────────────────────────────
+// VEXFLOW RENDERING
+// ────────────────────────────────────────────────────────────
+
+const VF = Vex.Flow;
+
+function staffWidth() {
+  const el = document.getElementById('notation');
+  return Math.min(el.parentElement.clientWidth - 16, 330);
+}
+
+// chords: array of chord objects for one measure; duration: VexFlow duration string
+function renderStaff(chords, duration) {
+  const container = document.getElementById('notation');
+  container.innerHTML = '';
+
+  const W = staffWidth();
+  const H = 150;
+  const staveX = 16;
+  const staveW = W - 20;
+
+  const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
+  renderer.resize(W, H);
+  const ctx = renderer.getContext();
+  ctx.setFont('Arial', 10, '');
+
+  // Treble stave
+  const treble = new VF.Stave(staveX, 5, staveW);
+  treble.addClef('treble');
+  treble.setContext(ctx).draw();
+
+  // Bass stave
+  const bass = new VF.Stave(staveX, 85, staveW);
+  bass.addClef('bass');
+  bass.setContext(ctx).draw();
+
+  // Grand staff connectors
+  const brace = new VF.StaveConnector(treble, bass);
+  brace.setType(VF.StaveConnector.type.BRACE);
+  brace.setContext(ctx).draw();
+
+  const lineL = new VF.StaveConnector(treble, bass);
+  lineL.setType(VF.StaveConnector.type.SINGLE_LEFT);
+  lineL.setContext(ctx).draw();
+
+  const lineR = new VF.StaveConnector(treble, bass);
+  lineR.setType(VF.StaveConnector.type.SINGLE_RIGHT);
+  lineR.setContext(ctx).draw();
+
+  if (!chords || chords.length === 0) return;
+
+  const dur = duration || 'w';
+  const trebleNotes = chords.map(c => new VF.StaveNote({ clef: 'treble', keys: c.treble, duration: dur }));
+  const bassNotes   = chords.map(c => new VF.StaveNote({ clef: 'bass',   keys: c.bass,   duration: dur }));
+
+  VF.Formatter.FormatAndDraw(ctx, treble, trebleNotes);
+  VF.Formatter.FormatAndDraw(ctx, bass,   bassNotes);
+}
+
+// ────────────────────────────────────────────────────────────
+// UI
+// ────────────────────────────────────────────────────────────
+
+const measuresRange = document.getElementById('measures-range');
+const measuresValEl  = document.getElementById('measures-val');
+const lockMeasuresEl = document.getElementById('lock-measures');
+const onsetsRange    = document.getElementById('onsets-range');
+const onsetsValEl    = document.getElementById('onsets-val');
+const lockOnsetsEl   = document.getElementById('lock-onsets');
+const generateBtn    = document.getElementById('generate-btn');
+const prevBtn        = document.getElementById('prev-btn');
+const nextBtn        = document.getElementById('next-btn');
+const counterEl      = document.getElementById('measure-counter');
+const labelEl        = document.getElementById('chord-label');
+
+function updateNavButtons() {
+  const has = !!state.measures;
+  prevBtn.disabled = !has || state.currentIdx === 0;
+  nextBtn.disabled = !has || state.currentIdx === state.measures.length - 1;
+}
+
+function showMeasure(idx) {
+  const chords = state.measures[idx];
+  const dur    = durationForOnsets(state.numOnsets);
+  renderStaff(chords, dur);
+  labelEl.textContent   = chords.map(c => c.name).join(' - ');
+  counterEl.textContent = 'Measure ' + (idx + 1) + ' of ' + state.measures.length;
+  updateNavButtons();
+}
+
+measuresRange.addEventListener('input', function () {
+  state.numMeasures = MEASURE_STOPS[parseInt(this.value)];
+  measuresValEl.textContent = state.numMeasures;
+});
+
+lockMeasuresEl.addEventListener('change', function () {
+  state.lockMeasures = this.checked;
+});
+
+generateBtn.addEventListener('click', function () {
+  state.measures   = generateProgression(state.numMeasures, state.numOnsets);
+  state.currentIdx = 0;
+  showMeasure(0);
+});
+
+prevBtn.addEventListener('click', function () {
+  if (!state.measures || state.currentIdx <= 0) return;
+  state.currentIdx--;
+  showMeasure(state.currentIdx);
+});
+
+nextBtn.addEventListener('click', function () {
+  if (!state.measures || state.currentIdx >= state.measures.length - 1) return;
+  state.currentIdx++;
+  showMeasure(state.currentIdx);
+});
+
+onsetsRange.addEventListener('input', function () {
+  state.numOnsets = parseInt(this.value);
+  onsetsValEl.textContent = state.numOnsets;
+  if (state.measures) showMeasure(state.currentIdx);
+});
+
+lockOnsetsEl.addEventListener('change', function () {
+  state.lockOnsets = this.checked;
+});
+
+// ── Init ──────────────────────────────────────────────────────
+window.addEventListener('load', function () {
+  renderStaff(null); // draw empty grand staff on load
+});
+
+})();
+</script>
+</body>
+</html>
