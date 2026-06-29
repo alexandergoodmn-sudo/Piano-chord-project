@@ -515,6 +515,25 @@ function renderStaff(measureArr, duration, density) {
     if (measureArr[0]) drawNotes(t1, b1, measureArr[0]);
     if (measureArr[1]) drawNotes(t2, b2, measureArr[1]);
   }
+
+  // Reference dots — stacked vertically at top-right corner
+  const svg = container.querySelector('svg');
+  const DOT_COLORS = ['#e53935','#fb8c00','#fdd835','#43a047','#1e88e5','#8e24aa'];
+  DOT_COLORS.forEach(function(color, i) {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const cx = W - 10, cy = 8 + i * 16;
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', cx); c.setAttribute('cy', cy);
+    c.setAttribute('r', 7); c.setAttribute('fill', color);
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t.setAttribute('x', cx); t.setAttribute('y', cy + 4);
+    t.setAttribute('text-anchor', 'middle');
+    t.setAttribute('font-size', '8'); t.setAttribute('fill', '#fff');
+    t.setAttribute('font-weight', 'bold');
+    t.textContent = i + 1;
+    g.appendChild(c); g.appendChild(t);
+    svg.appendChild(g);
+  });
 }
 
 // ────────────────────────────────────────────────────────────
