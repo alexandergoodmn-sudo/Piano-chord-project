@@ -441,11 +441,11 @@ const VF = Vex.Flow;
 function staffWidth() {
   const el = document.getElementById('notation');
   const base = Math.min(el.parentElement.clientWidth - 16, 330);
-  return state.numMeasures === 4 ? Math.round(base * 0.86) : base;
+  return (state.numMeasures === 4 || state.numMeasures === 8) ? Math.round(base * 0.86) : base;
 }
 
-// chords: array of chord objects for one measure; duration: VexFlow duration string
-function renderStaff(chords, duration, density) {
+// measureArr: array of 1 or 2 chord-arrays (one per measure).
+function renderStaff(measureArr, duration, density) {
   const container = document.getElementById('notation');
   container.innerHTML = '';
 
@@ -453,44 +453,65 @@ function renderStaff(chords, duration, density) {
   const H = 150;
   const staveX = 16;
   const staveW = W - 20;
+  const dur = duration || 'w';
+  const di  = Math.min(Math.max((density || 3), 1), 5) - 1;
 
   const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
   renderer.resize(W, H);
   const ctx = renderer.getContext();
   ctx.setFont('Arial', 10, '');
 
-  // Treble stave
-  const treble = new VF.Stave(staveX, 5, staveW);
-  treble.addClef('treble');
-  treble.setContext(ctx).draw();
+  function drawNotes(staveT, staveB, chords) {
+    if (!chords || !chords.length) return;
+    const tN = chords.map(c => new VF.StaveNote({ clef: 'treble', keys: c.v[di], duration: dur }));
+    const bN = chords.map(c => new VF.StaveNote({ clef: 'bass',   keys: c.bass,   duration: dur }));
+    VF.Formatter.FormatAndDraw(ctx, staveT, tN);
+    VF.Formatter.FormatAndDraw(ctx, staveB, bN);
+  }
 
-  // Bass stave
-  const bass = new VF.Stave(staveX, 85, staveW);
-  bass.addClef('bass');
-  bass.setContext(ctx).draw();
+  function connect(t, b, type) {
+    const sc = new VF.StaveConnector(t, b);
+    sc.setType(type);
+    sc.setContext(ctx).draw();
+  }
 
-  // Grand staff connectors
-  const brace = new VF.StaveConnector(treble, bass);
-  brace.setType(VF.StaveConnector.type.BRACE);
-  brace.setContext(ctx).draw();
+  const twoUp = measureArr && measureArr.length === 2;
 
-  const lineL = new VF.StaveConnector(treble, bass);
-  lineL.setType(VF.StaveConnector.type.SINGLE_LEFT);
-  lineL.setContext(ctx).draw();
+  if (!twoUp) {
+    // ── Single measure ──
+    const treble = new VF.Stave(staveX, 5, staveW).addClef('treble').setContext(ctx);
+    treble.draw();
+    const bass   = new VF.Stave(staveX, 85, staveW).addClef('bass').setContext(ctx);
+    bass.draw();
+    connect(treble, bass, VF.StaveConnector.type.BRACE);
+    connect(treble, bass, VF.StaveConnector.type.SINGLE_LEFT);
+    connect(treble, bass, VF.StaveConnector.type.SINGLE_RIGHT);
+    if (measureArr && measureArr[0]) drawNotes(treble, bass, measureArr[0]);
+  } else {
+    // ── Two measures side by side ──
+    const halfW = Math.floor(staveW / 2);
+    const NONE  = (VF.Barline && VF.Barline.type && VF.Barline.type.NONE) || 7;
 
-  const lineR = new VF.StaveConnector(treble, bass);
-  lineR.setType(VF.StaveConnector.type.SINGLE_RIGHT);
-  lineR.setContext(ctx).draw();
+    const t1 = new VF.Stave(staveX, 5,  halfW).addClef('treble').setContext(ctx);
+    t1.draw();
+    const b1 = new VF.Stave(staveX, 85, halfW).addClef('bass').setContext(ctx);
+    b1.draw();
 
-  if (!chords || chords.length === 0) return;
+    const t2 = new VF.Stave(staveX + halfW, 5,  halfW).setContext(ctx);
+    t2.setBegBarType(NONE);
+    t2.draw();
+    const b2 = new VF.Stave(staveX + halfW, 85, halfW).setContext(ctx);
+    b2.setBegBarType(NONE);
+    b2.draw();
 
-  const dur = duration || 'w';
-  const di = Math.min(Math.max((density || 3), 1), 5) - 1;
-  const trebleNotes = chords.map(c => new VF.StaveNote({ clef: 'treble', keys: c.v[di], duration: dur }));
-  const bassNotes   = chords.map(c => new VF.StaveNote({ clef: 'bass',   keys: c.bass,   duration: dur }));
+    connect(t1, b1, VF.StaveConnector.type.BRACE);
+    connect(t1, b1, VF.StaveConnector.type.SINGLE_LEFT);
+    connect(t1, b1, VF.StaveConnector.type.SINGLE_RIGHT); // middle barline
+    connect(t2, b2, VF.StaveConnector.type.SINGLE_RIGHT); // final barline
 
-  VF.Formatter.FormatAndDraw(ctx, treble, trebleNotes);
-  VF.Formatter.FormatAndDraw(ctx, bass,   bassNotes);
+    if (measureArr[0]) drawNotes(t1, b1, measureArr[0]);
+    if (measureArr[1]) drawNotes(t2, b2, measureArr[1]);
+  }
 }
 
 // ────────────────────────────────────────────────────────────
@@ -510,17 +531,34 @@ const counterEl      = document.getElementById('measure-counter');
 const labelEl        = document.getElementById('chord-label');
 
 function updateNavButtons() {
-  const has = !!state.measures;
+  const has  = !!state.measures;
+  const step = state.numMeasures === 8 ? 2 : 1;
   prevBtn.disabled = !has || state.currentIdx === 0;
-  nextBtn.disabled = !has || state.currentIdx === state.measures.length - 1;
+  nextBtn.disabled = !has || state.currentIdx >= state.measures.length - step;
 }
 
 function showMeasure(idx) {
-  const chords = state.measures[idx];
-  const dur    = state.beatType;
-  renderStaff(chords, dur, state.chordDensity);
-  labelEl.textContent   = chords.map(c => chordName(c, state.chordDensity)).join(' - ');
-  counterEl.textContent = 'Measure ' + (idx + 1) + ' of ' + state.measures.length;
+  const dur  = state.beatType;
+  const step = state.numMeasures === 8 ? 2 : 1;
+  let measureArr, label, counter;
+
+  if (step === 2) {
+    const c1 = state.measures[idx];
+    const c2 = state.measures[idx + 1] || [];
+    measureArr = [c1, c2];
+    label   = c1.map(c => chordName(c, state.chordDensity)).join(' - ')
+              + '  |  '
+              + c2.map(c => chordName(c, state.chordDensity)).join(' - ');
+    counter = 'Measures ' + (idx + 1) + '-' + (idx + 2) + ' of 8';
+  } else {
+    measureArr = [state.measures[idx]];
+    label   = state.measures[idx].map(c => chordName(c, state.chordDensity)).join(' - ');
+    counter = 'Measure ' + (idx + 1) + ' of ' + state.measures.length;
+  }
+
+  renderStaff(measureArr, dur, state.chordDensity);
+  labelEl.textContent   = label;
+  counterEl.textContent = counter;
   updateNavButtons();
 }
 
@@ -541,13 +579,14 @@ generateBtn.addEventListener('click', function () {
 
 prevBtn.addEventListener('click', function () {
   if (!state.measures || state.currentIdx <= 0) return;
-  state.currentIdx--;
+  state.currentIdx -= state.numMeasures === 8 ? 2 : 1;
   showMeasure(state.currentIdx);
 });
 
 nextBtn.addEventListener('click', function () {
-  if (!state.measures || state.currentIdx >= state.measures.length - 1) return;
-  state.currentIdx++;
+  const step = state.numMeasures === 8 ? 2 : 1;
+  if (!state.measures || state.currentIdx >= state.measures.length - step) return;
+  state.currentIdx += step;
   showMeasure(state.currentIdx);
 });
 
@@ -598,7 +637,7 @@ document.getElementById('mode-btn').addEventListener('click', function () {
 
 // ── Init ──────────────────────────────────────────────────────
 window.addEventListener('load', function () {
-  renderStaff(null); // draw empty grand staff on load
+  renderStaff(null);
 });
 
 })();
