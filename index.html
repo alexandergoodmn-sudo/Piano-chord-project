@@ -199,16 +199,21 @@ html, body {
 }
 
 .slider-wrap input[type="range"]::-webkit-slider-runnable-track {
-  height: 6px;
-  background: #ccc;
-  border-radius: 3px;
+  height: 56px;
+  border-radius: 28px;
+  background: linear-gradient(
+    transparent calc(50% - 3px),
+    #ccc       calc(50% - 3px),
+    #ccc       calc(50% + 3px),
+    transparent calc(50% + 3px)
+  );
 }
 
 .slider-wrap input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 56px;
   height: 56px;
-  margin-top: -25px;
+  margin-top: 0;
   background: #111;
   border-radius: 50%;
   cursor: pointer;
