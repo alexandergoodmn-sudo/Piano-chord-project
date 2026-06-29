@@ -451,9 +451,9 @@ function renderStaff(measureArr, duration, density) {
   container.innerHTML = '';
 
   const W = staffWidth();
-  const H = 180;
+  const H = 190;
   const TREBLE_Y = 5;
-  const BASS_Y   = 58;
+  const BASS_Y   = 72;
   const staveX = 16;
   const staveW = W - 20;
   const dur = duration || 'w';
@@ -524,24 +524,6 @@ function renderStaff(measureArr, duration, density) {
   svg.setAttribute('viewBox', `0 ${TOP_TRIM} ${W} ${SHOW_H}`);
   svg.setAttribute('height', SHOW_H);
 
-  // Reference dots inside VexFlow's <g> (shares VexFlow coordinate space)
-  const vfGroup = svg.querySelector('g') || svg;
-  const DOT_COLORS = ['#e53935','#fb8c00','#fdd835','#43a047','#1e88e5','#8e24aa'];
-  DOT_COLORS.forEach(function(color, i) {
-    const grp = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    const cx = W - 10, cy = TREBLE_Y + i * 16;
-    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    c.setAttribute('cx', cx); c.setAttribute('cy', cy);
-    c.setAttribute('r', 7); c.setAttribute('fill', color);
-    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    t.setAttribute('x', cx); t.setAttribute('y', cy + 4);
-    t.setAttribute('text-anchor', 'middle');
-    t.setAttribute('font-size', '8'); t.setAttribute('fill', '#fff');
-    t.setAttribute('font-weight', 'bold');
-    t.textContent = i + 1;
-    grp.appendChild(c); grp.appendChild(t);
-    vfGroup.appendChild(grp);
-  });
 }
 
 // ────────────────────────────────────────────────────────────
