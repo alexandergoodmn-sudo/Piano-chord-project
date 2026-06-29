@@ -249,6 +249,12 @@ html, body {
   font-weight: 500;
 }
 
+.beat-ticks span {
+  font-size: 18px;
+  color: #aaa;
+  line-height: 1;
+}
+
 .slider-current {
   font-size: 15px;
   font-weight: 700;
@@ -312,6 +318,21 @@ html, body {
         </div>
       </div>
       <span class="slider-current" id="density-val">3</span>
+    </div>
+    <div class="slider-row">
+      <input type="checkbox" id="lock-beat" title="Lock this value">
+      <span class="slider-name">Beat type</span>
+      <div class="slider-wrap">
+        <input type="range" id="beat-range" min="0" max="4" step="1" value="0">
+        <div class="tick-row beat-ticks">
+          <span title="Whole note">w</span>
+          <span title="Half note">h</span>
+          <span title="Quarter note">&#9833;</span>
+          <span title="Eighth note">&#9834;</span>
+          <span title="Sixteenth note">&#9836;</span>
+        </div>
+      </div>
+      <span class="slider-current" id="beat-val">w</span>
     </div>
   </div>
 
@@ -401,6 +422,8 @@ const state = {
   numOnsets: 1,
   chordDensity: 3,
   lockDensity: false,
+  beatType: 'w',
+  lockBeat: false,
   lockMeasures: false,
   lockOnsets: false,
   currentIdx: 0,
@@ -491,7 +514,7 @@ function updateNavButtons() {
 
 function showMeasure(idx) {
   const chords = state.measures[idx];
-  const dur    = durationForOnsets(state.numOnsets);
+  const dur    = state.beatType;
   renderStaff(chords, dur, state.chordDensity);
   labelEl.textContent   = chords.map(c => chordName(c, state.chordDensity)).join(' - ');
   counterEl.textContent = 'Measure ' + (idx + 1) + ' of ' + state.measures.length;
@@ -547,6 +570,23 @@ densityRange.addEventListener('input', function () {
 
 lockDensityEl.addEventListener('change', function () {
   state.lockDensity = this.checked;
+});
+
+const BEAT_DURATIONS = ['w','h','q','8','16'];
+const BEAT_LABELS    = ['w','h','♩','♪','♬'];
+const beatRange  = document.getElementById('beat-range');
+const beatValEl  = document.getElementById('beat-val');
+const lockBeatEl = document.getElementById('lock-beat');
+
+beatRange.addEventListener('input', function () {
+  const idx = parseInt(this.value);
+  state.beatType = BEAT_DURATIONS[idx];
+  beatValEl.textContent = BEAT_LABELS[idx];
+  if (state.measures) showMeasure(state.currentIdx);
+});
+
+lockBeatEl.addEventListener('change', function () {
+  state.lockBeat = this.checked;
 });
 
 // ── Init ──────────────────────────────────────────────────────
