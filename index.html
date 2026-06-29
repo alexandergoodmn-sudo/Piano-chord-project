@@ -272,7 +272,6 @@ html, body {
   <div id="fixed-top">
     <div id="staff-area">
       <div id="notation"></div>
-      <div id="chord-label"></div>
       <div id="nav-row" style="display:none">
         <button class="nav-arrow" id="prev-btn" disabled>&#8592;</button>
         <span id="measure-counter">Tap Generate</span>
@@ -533,7 +532,6 @@ const generateBtn    = document.getElementById('generate-btn');
 const prevBtn        = document.getElementById('prev-btn');
 const nextBtn        = document.getElementById('next-btn');
 const counterEl      = document.getElementById('measure-counter');
-const labelEl        = document.getElementById('chord-label');
 
 function updateNavButtons() {
   const has  = !!state.measures;
@@ -562,7 +560,6 @@ function showMeasure(idx) {
   }
 
   renderStaff(measureArr, dur, state.chordDensity);
-  labelEl.textContent   = label;
   counterEl.textContent = counter;
   updateNavButtons();
 }
