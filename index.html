@@ -273,7 +273,7 @@ html, body {
     <div id="staff-area">
       <div id="notation"></div>
       <div id="chord-label"></div>
-      <div id="nav-row">
+      <div id="nav-row" style="display:none">
         <button class="nav-arrow" id="prev-btn" disabled>&#8592;</button>
         <span id="measure-counter">Tap Generate</span>
         <button class="nav-arrow" id="next-btn" disabled>&#8594;</button>
@@ -638,6 +638,7 @@ lockBeatEl.addEventListener('change', function () {
 
 document.getElementById('mode-btn').addEventListener('click', function () {
   this.classList.toggle('toggled');
+  document.getElementById('nav-row').style.display = this.classList.contains('toggled') ? 'flex' : 'none';
 });
 
 // ── Init ──────────────────────────────────────────────────────
