@@ -125,6 +125,8 @@ html, body {
 }
 
 .side-btn:active { background: #e8e8e8; }
+.side-btn.toggled { background: #111; color: #fff; border-color: #111; }
+.side-btn.toggled:active { background: #333; }
 
 #generate-btn {
   flex: 1;
@@ -587,6 +589,10 @@ beatRange.addEventListener('input', function () {
 
 lockBeatEl.addEventListener('change', function () {
   state.lockBeat = this.checked;
+});
+
+document.getElementById('mode-btn').addEventListener('click', function () {
+  this.classList.toggle('toggled');
 });
 
 // ── Init ──────────────────────────────────────────────────────
