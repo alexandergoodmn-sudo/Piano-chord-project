@@ -451,9 +451,9 @@ function renderStaff(measureArr, duration, density) {
   container.innerHTML = '';
 
   const W = staffWidth();
-  const H = 160;
+  const H = 180;
   const TREBLE_Y = 5;
-  const BASS_Y   = 78;
+  const BASS_Y   = 58;
   const staveX = 16;
   const staveW = W - 20;
   const dur = duration || 'w';
@@ -516,8 +516,15 @@ function renderStaff(measureArr, duration, density) {
     if (measureArr[1]) drawNotes(t2, b2, measureArr[1]);
   }
 
-  // Reference dots — placed inside VexFlow's <g> so they share its coordinate space
+  // Trim dead space: VexFlow's internal offset pushes stave content ~38px below y=0.
+  // Shift the viewBox up so the staff fills from the top of the SVG element.
+  const TOP_TRIM = 38;
+  const SHOW_H   = H - TOP_TRIM;
   const svg = container.querySelector('svg');
+  svg.setAttribute('viewBox', `0 ${TOP_TRIM} ${W} ${SHOW_H}`);
+  svg.setAttribute('height', SHOW_H);
+
+  // Reference dots inside VexFlow's <g> (shares VexFlow coordinate space)
   const vfGroup = svg.querySelector('g') || svg;
   const DOT_COLORS = ['#e53935','#fb8c00','#fdd835','#43a047','#1e88e5','#8e24aa'];
   DOT_COLORS.forEach(function(color, i) {
