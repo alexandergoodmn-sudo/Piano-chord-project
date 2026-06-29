@@ -165,6 +165,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-bottom: 20px;
 }
 
 .slider-row input[type="checkbox"] {
@@ -290,6 +291,17 @@ html, body {
       </div>
       <span class="slider-current" id="measures-val">4</span>
     </div>
+    <div class="slider-row">
+      <input type="checkbox" id="lock-onsets" title="Lock this value">
+      <span class="slider-name">Onsets</span>
+      <div class="slider-wrap">
+        <input type="range" id="onsets-range" min="1" max="8" step="1" value="1">
+        <div class="tick-row">
+          <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
+        </div>
+      </div>
+      <span class="slider-current" id="onsets-val">1</span>
+    </div>
   </div>
 
 </div>
@@ -323,13 +335,28 @@ const PATTERNS = [
   [0,5,1,4],  // I–vi–ii–V
 ];
 
-function generateProgression(numMeasures) {
+// Maps onset count to VexFlow duration string
+function durationForOnsets(n) {
+  if (n <= 1) return 'w';
+  if (n <= 2) return 'h';
+  if (n <= 4) return 'q';
+  return '8';
+}
+
+// Returns array-of-arrays: measures[m] = [chord, chord, ...]
+function generateProgression(numMeasures, numOnsets) {
   const pat = PATTERNS[Math.floor(Math.random() * PATTERNS.length)];
-  const result = [];
-  for (let i = 0; i < numMeasures; i++) {
-    result.push(CHORDS[pat[i % pat.length]]);
+  const measures = [];
+  let eventIdx = 0;
+  for (let m = 0; m < numMeasures; m++) {
+    const measure = [];
+    for (let o = 0; o < numOnsets; o++) {
+      measure.push(CHORDS[pat[eventIdx % pat.length]]);
+      eventIdx++;
+    }
+    measures.push(measure);
   }
-  return result;
+  return measures;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -340,9 +367,11 @@ const MEASURE_STOPS = [3, 4, 8];
 
 const state = {
   numMeasures: 4,
+  numOnsets: 1,
   lockMeasures: false,
+  lockOnsets: false,
   currentIdx: 0,
-  progression: null,
+  measures: null, // array of arrays: [[chord,...], ...]
 };
 
 // ────────────────────────────────────────────────────────────
@@ -356,7 +385,8 @@ function staffWidth() {
   return Math.min(el.parentElement.clientWidth - 16, 330);
 }
 
-function renderStaff(chord) {
+// chords: array of chord objects for one measure; duration: VexFlow duration string
+function renderStaff(chords, duration) {
   const container = document.getElementById('notation');
   container.innerHTML = '';
 
@@ -393,19 +423,14 @@ function renderStaff(chord) {
   lineR.setType(VF.StaveConnector.type.SINGLE_RIGHT);
   lineR.setContext(ctx).draw();
 
-  if (!chord) return;
+  if (!chords || chords.length === 0) return;
 
-  // Notes
-  const trebleNote = new VF.StaveNote({
-    clef: 'treble', keys: chord.treble, duration: 'w',
-  });
-  const bassNote = new VF.StaveNote({
-    clef: 'bass', keys: chord.bass, duration: 'w',
-  });
+  const dur = duration || 'w';
+  const trebleNotes = chords.map(c => new VF.StaveNote({ clef: 'treble', keys: c.treble, duration: dur }));
+  const bassNotes   = chords.map(c => new VF.StaveNote({ clef: 'bass',   keys: c.bass,   duration: dur }));
 
-  // Format and draw each stave independently
-  VF.Formatter.FormatAndDraw(ctx, treble, [trebleNote]);
-  VF.Formatter.FormatAndDraw(ctx, bass,   [bassNote]);
+  VF.Formatter.FormatAndDraw(ctx, treble, trebleNotes);
+  VF.Formatter.FormatAndDraw(ctx, bass,   bassNotes);
 }
 
 // ────────────────────────────────────────────────────────────
@@ -415,6 +440,9 @@ function renderStaff(chord) {
 const measuresRange = document.getElementById('measures-range');
 const measuresValEl  = document.getElementById('measures-val');
 const lockMeasuresEl = document.getElementById('lock-measures');
+const onsetsRange    = document.getElementById('onsets-range');
+const onsetsValEl    = document.getElementById('onsets-val');
+const lockOnsetsEl   = document.getElementById('lock-onsets');
 const generateBtn    = document.getElementById('generate-btn');
 const prevBtn        = document.getElementById('prev-btn');
 const nextBtn        = document.getElementById('next-btn');
@@ -422,16 +450,17 @@ const counterEl      = document.getElementById('measure-counter');
 const labelEl        = document.getElementById('chord-label');
 
 function updateNavButtons() {
-  const has = !!state.progression;
+  const has = !!state.measures;
   prevBtn.disabled = !has || state.currentIdx === 0;
-  nextBtn.disabled = !has || state.currentIdx === state.progression.length - 1;
+  nextBtn.disabled = !has || state.currentIdx === state.measures.length - 1;
 }
 
 function showMeasure(idx) {
-  const chord = state.progression[idx];
-  renderStaff(chord);
-  labelEl.textContent     = chord.name + ' (' + chord.roman + ')';
-  counterEl.textContent   = 'Measure ' + (idx + 1) + ' of ' + state.progression.length;
+  const chords = state.measures[idx];
+  const dur    = durationForOnsets(state.numOnsets);
+  renderStaff(chords, dur);
+  labelEl.textContent   = chords.map(c => c.name).join(' - ');
+  counterEl.textContent = 'Measure ' + (idx + 1) + ' of ' + state.measures.length;
   updateNavButtons();
 }
 
@@ -445,21 +474,31 @@ lockMeasuresEl.addEventListener('change', function () {
 });
 
 generateBtn.addEventListener('click', function () {
-  state.progression = generateProgression(state.numMeasures);
-  state.currentIdx  = 0;
+  state.measures   = generateProgression(state.numMeasures, state.numOnsets);
+  state.currentIdx = 0;
   showMeasure(0);
 });
 
 prevBtn.addEventListener('click', function () {
-  if (!state.progression || state.currentIdx <= 0) return;
+  if (!state.measures || state.currentIdx <= 0) return;
   state.currentIdx--;
   showMeasure(state.currentIdx);
 });
 
 nextBtn.addEventListener('click', function () {
-  if (!state.progression || state.currentIdx >= state.progression.length - 1) return;
+  if (!state.measures || state.currentIdx >= state.measures.length - 1) return;
   state.currentIdx++;
   showMeasure(state.currentIdx);
+});
+
+onsetsRange.addEventListener('input', function () {
+  state.numOnsets = parseInt(this.value);
+  onsetsValEl.textContent = state.numOnsets;
+  if (state.measures) showMeasure(state.currentIdx);
+});
+
+lockOnsetsEl.addEventListener('change', function () {
+  state.lockOnsets = this.checked;
 });
 
 // ── Init ──────────────────────────────────────────────────────
