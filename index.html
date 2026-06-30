@@ -95,6 +95,28 @@ html, body {
   letter-spacing: 0.1px;
 }
 
+/* ── Clock row ── */
+#clock-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 4px 0 2px;
+  background: #fff;
+}
+
+#clock-btn {
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: #222;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 50%;
+  line-height: 0;
+}
+
+#clock-btn:active { color: #555; }
+
 /* ── Divider / generate row ── */
 #divider-box {
   height: 76px;
@@ -275,6 +297,26 @@ html, body {
         <span id="measure-counter">Tap Generate</span>
         <button class="nav-arrow" id="next-btn" disabled>&#8594;</button>
       </div>
+    </div>
+    <div id="clock-row">
+      <button id="clock-btn" title="Tempo">
+        <svg width="36" height="40" viewBox="0 0 36 40" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <!-- bells -->
+          <path d="M9 8 Q9 3 14 3" stroke-width="2.2"/>
+          <path d="M27 8 Q27 3 22 3" stroke-width="2.2"/>
+          <!-- body -->
+          <circle cx="18" cy="21" r="14" stroke-width="2.2"/>
+          <!-- hour hand ~10 -->
+          <line x1="18" y1="21" x2="11" y2="14" stroke-width="2.2"/>
+          <!-- minute hand ~2 -->
+          <line x1="18" y1="21" x2="23" y2="12" stroke-width="1.8"/>
+          <!-- center dot -->
+          <circle cx="18" cy="21" r="1.5" fill="currentColor" stroke="none"/>
+          <!-- feet -->
+          <line x1="11" y1="34" x2="8" y2="38" stroke-width="2.2"/>
+          <line x1="25" y1="34" x2="28" y2="38" stroke-width="2.2"/>
+        </svg>
+      </button>
     </div>
     <div id="divider-box">
       <button class="side-btn" id="genre-btn">Genre</button>
