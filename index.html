@@ -44,6 +44,7 @@ html, body {
   display: flex;
   justify-content: center;
   align-items: center;
+  min-height: 172px; /* prevents scroll-anchor defeat when SVG rebuilds */
 }
 
 #notation svg {
@@ -448,12 +449,13 @@ function durationForOnsets(n) {
 }
 
 // Weighted random value centred on `target`, clamped to [min, max]
+// Distribution: 55% exact, 15% ±1, 7.5% ±2 (symmetric)
 function weightedRandom(target, min, max) {
   const r = Math.random();
-  if (r < 0.55) return target;
-  if (r < 0.75) return Math.max(min, target - 1);
-  if (r < 0.90) return Math.min(max, target + 1);
-  if (r < 0.97) return Math.max(min, target - 2);
+  if (r < 0.55)  return target;
+  if (r < 0.70)  return Math.max(min, target - 1);
+  if (r < 0.85)  return Math.min(max, target + 1);
+  if (r < 0.925) return Math.max(min, target - 2);
   return Math.min(max, target + 2);
 }
 
@@ -639,21 +641,15 @@ function updateNavButtons() {
 }
 
 function showMeasure(idx) {
-  const dur  = state.beatType;
-  const step = state.numMeasures === 8 ? 2 : 1;
-  let measureArr, label, counter;
+  const dur    = state.beatType;
+  const step   = state.numMeasures === 8 ? 2 : 1;
+  let measureArr, counter;
 
   if (step === 2) {
-    const c1 = state.measures[idx];
-    const c2 = state.measures[idx + 1] || [];
-    measureArr = [c1, c2];
-    label   = c1.map(c => chordName(c, state.chordDensity)).join(' - ')
-              + '  |  '
-              + c2.map(c => chordName(c, state.chordDensity)).join(' - ');
-    counter = 'Measures ' + (idx + 1) + '-' + (idx + 2) + ' of 8';
+    measureArr = [state.measures[idx], state.measures[idx + 1] || []];
+    counter = 'Measures ' + (idx + 1) + '-' + (idx + 2) + ' of ' + state.measures.length;
   } else {
     measureArr = [state.measures[idx]];
-    label   = state.measures[idx].map(c => chordName(c, state.chordDensity)).join(' - ');
     counter = 'Measure ' + (idx + 1) + ' of ' + state.measures.length;
   }
 
