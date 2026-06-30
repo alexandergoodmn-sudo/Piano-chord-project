@@ -628,24 +628,6 @@ const state = {
   measures: null, // array of arrays: [[chord,...], ...]
 };
 
-// Applies the noteAccidentals setting to a single VexFlow note string.
-// Returns a VexFlow key name (e.g. 'G', 'Bb') if the noteAccidentals state matches
-// a standard key signature, otherwise null (non-standard combos show no stave key sig).
-function vfKeyName(acc) {
-  const sharpOrder = ['F','C','G','D','A','E','B'];
-  const flatOrder  = ['B','E','A','D','G','C','F'];
-  const sharps = sharpOrder.filter(n => acc[n] ===  1);
-  const flats  = flatOrder.filter(n  => acc[n] === -1);
-  if (sharps.length > 0 && flats.length > 0) return null; // mixed = non-standard
-  if (sharps.length === 0 && flats.length === 0) return null;
-  if (sharps.length > 0) {
-    if (sharps.join('') !== sharpOrder.slice(0, sharps.length).join('')) return null;
-    return ['G','D','A','E','B','F#','C#'][sharps.length - 1];
-  }
-  if (flats.join('') !== flatOrder.slice(0, flats.length).join('')) return null;
-  return ['F','Bb','Eb','Ab','Db','Gb','Cb'][flats.length - 1];
-}
-
 // Strips any existing accidental from transposition and replaces with the target.
 function applyAccidental(vfNote) {
   const letter = vfNote[0].toUpperCase();
@@ -718,16 +700,50 @@ function renderStaff(measureArr, duration, density) {
     sc.setContext(ctx).draw();
   }
 
-  const twoUp  = measureArr && measureArr.length === 2;
-  const keySig = vfKeyName(state.noteAccidentals);
+  const twoUp = measureArr && measureArr.length === 2;
+
+  // Adds custom key signature accidentals (any combination) to a stave.
+  // Uses treble-clef positions; VexFlow's convertAccLines applies the bass-clef offset (+1) automatically.
+  function addCustomKeySig(stave) {
+    const sharpOrder = ['F','C','G','D','A','E','B'];
+    const flatOrder  = ['B','E','A','D','G','C','F'];
+    const sharpLines = [0, 1.5, -0.5, 1, 2.5, 0.5, 2];
+    const flatLines  = [2, 0.5, 2.5, 1, 3, 1.5, 3.5];
+    const customList = [];
+    sharpOrder.forEach(function(n, i) {
+      if (state.noteAccidentals[n] === 1)  customList.push({ type: '#', line: sharpLines[i] });
+    });
+    flatOrder.forEach(function(n, i) {
+      if (state.noteAccidentals[n] === -1) customList.push({ type: 'b', line: flatLines[i] });
+    });
+    if (!customList.length) return;
+
+    const ks = new VF.KeySignature('C');
+    ks.format = function () {
+      if (this.formatted) return;
+      if (!this.stave) return;
+      this.width = 0;
+      this.glyphs = [];
+      this.xPositions = [0];
+      this.accList = customList.map(function(a) { return { type: a.type, line: a.line }; });
+      var firstType = this.accList[0].type;
+      var clef = this.stave.clef || 'treble';
+      this.convertAccLines(clef, firstType, this.accList);
+      for (var i = 0; i < this.accList.length; i++) {
+        this.convertToGlyph(this.accList[i], this.accList[i + 1]);
+      }
+      this.formatted = true;
+    };
+    stave.addModifier(ks, 5); // 5 = StaveModifier.Position.BEGIN
+  }
 
   if (!twoUp) {
     // ── Single measure ──
     const treble = new VF.Stave(staveX, TREBLE_Y, staveW).addClef('treble').setContext(ctx);
-    if (keySig) treble.addKeySignature(keySig);
+    addCustomKeySig(treble);
     treble.draw();
     const bass   = new VF.Stave(staveX, BASS_Y, staveW).addClef('bass').setContext(ctx);
-    if (keySig) bass.addKeySignature(keySig);
+    addCustomKeySig(bass);
     bass.draw();
     connect(treble, bass, VF.StaveConnector.type.BRACE);
     connect(treble, bass, VF.StaveConnector.type.SINGLE_LEFT);
@@ -739,10 +755,10 @@ function renderStaff(measureArr, duration, density) {
     const NONE  = (VF.Barline && VF.Barline.type && VF.Barline.type.NONE) || 7;
 
     const t1 = new VF.Stave(staveX, TREBLE_Y, halfW).addClef('treble').setContext(ctx);
-    if (keySig) t1.addKeySignature(keySig);
+    addCustomKeySig(t1);
     t1.draw();
     const b1 = new VF.Stave(staveX, BASS_Y, halfW).addClef('bass').setContext(ctx);
-    if (keySig) b1.addKeySignature(keySig);
+    addCustomKeySig(b1);
     b1.draw();
 
     const t2 = new VF.Stave(staveX + halfW, TREBLE_Y, halfW).setContext(ctx);
