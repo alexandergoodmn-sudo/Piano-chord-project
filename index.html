@@ -332,6 +332,17 @@ html, body {
       </div>
       <span class="slider-current" id="beat-val">w</span>
     </div>
+    <div class="slider-row">
+      <input type="checkbox" id="lock-key" title="Lock this value">
+      <span class="slider-name">Key</span>
+      <div class="slider-wrap">
+        <input type="range" id="key-range" min="0" max="11" step="1" value="0">
+        <div class="tick-row">
+          <span>C</span><span>D&#9837;</span><span>D</span><span>E&#9837;</span><span>E</span><span>F</span><span>F&#9839;</span><span>G</span><span>A&#9837;</span><span>A</span><span>B&#9837;</span><span>B</span>
+        </div>
+      </div>
+      <span class="slider-current" id="key-val">C</span>
+    </div>
   </div>
 
 </div>
@@ -387,6 +398,47 @@ const TRANSITIONS = [
   [4],               // vii → V
 ];
 
+// ── Key transposition ──────────────────────────────────────────
+const KEYS = [
+  { name: 'C',  semi: 0,  flats: false },
+  { name: 'Db', semi: 1,  flats: true  },
+  { name: 'D',  semi: 2,  flats: false },
+  { name: 'Eb', semi: 3,  flats: true  },
+  { name: 'E',  semi: 4,  flats: false },
+  { name: 'F',  semi: 5,  flats: true  },
+  { name: 'F#', semi: 6,  flats: false },
+  { name: 'G',  semi: 7,  flats: false },
+  { name: 'Ab', semi: 8,  flats: true  },
+  { name: 'A',  semi: 9,  flats: false },
+  { name: 'Bb', semi: 10, flats: true  },
+  { name: 'B',  semi: 11, flats: false },
+];
+const CHROM_S = ['c','c#','d','d#','e','f','f#','g','g#','a','a#','b'];
+const CHROM_F = ['c','db','d','eb','e','f','gb','g','ab','a','bb','b'];
+
+function transposeNote(vfNote, semi, flats) {
+  const slash = vfNote.indexOf('/');
+  const name = vfNote.slice(0, slash);
+  const oct  = parseInt(vfNote.slice(slash + 1));
+  const ref  = flats ? CHROM_F : CHROM_S;
+  const idx  = ref.indexOf(name);
+  if (idx === -1) return vfNote;
+  const total = idx + semi;
+  const newIdx = ((total % 12) + 12) % 12;
+  const newOct = oct + Math.floor(total / 12);
+  return ref[newIdx] + '/' + newOct;
+}
+
+function chordsForKey(keyIdx) {
+  const { semi, flats } = KEYS[keyIdx];
+  if (semi === 0) return CHORDS;
+  return CHORDS.map(ch => ({
+    name: ch.name, roman: ch.roman,
+    v:    ch.v.map(voi => voi.map(n => transposeNote(n, semi, flats))),
+    bass: ch.bass.map(n => transposeNote(n, semi, flats)),
+  }));
+}
+
 // Maps onset count to VexFlow duration string
 function durationForOnsets(n) {
   if (n <= 1) return 'w';
@@ -420,20 +472,21 @@ function randomBeatType(baseDur) {
 // Returns array-of-arrays: measures[m] = [chord, ...]
 // When lockOnsets is true every measure has exactly numOnsets chords.
 // When false each measure gets a random count weighted toward numOnsets.
-function generateProgression(numMeasures, numOnsets, lockOnsets) {
+function generateProgression(numMeasures, numOnsets, lockOnsets, keyIndex, lockKey) {
   const measures = [];
   let cur = 0; // start on I
   for (let m = 0; m < numMeasures; m++) {
-    const count = lockOnsets ? numOnsets : randomOnsets(numOnsets);
-    const measure = [CHORDS[cur]];
+    const count    = lockOnsets ? numOnsets : randomOnsets(numOnsets);
+    const mKeyIdx  = lockKey ? keyIndex : weightedRandom(keyIndex, 0, 11);
+    const chords   = chordsForKey(mKeyIdx);
+    const measure  = [chords[cur]];
     for (let o = 1; o < count; o++) {
       const opts = TRANSITIONS[cur];
       let next;
       do { next = opts[Math.floor(Math.random() * opts.length)]; } while (opts.length > 1 && next === cur);
       cur = next;
-      measure.push(CHORDS[cur]);
+      measure.push(chords[cur]);
     }
-    // Advance cur for next measure's starting chord
     const opts = TRANSITIONS[cur];
     cur = opts[Math.floor(Math.random() * opts.length)];
     measures.push(measure);
@@ -456,6 +509,8 @@ const state = {
   lockBeat: false,
   lockMeasures: false,
   lockOnsets: false,
+  keyIndex: 0,
+  lockKey: false,
   currentIdx: 0,
   measures: null, // array of arrays: [[chord,...], ...]
 };
@@ -617,7 +672,7 @@ lockMeasuresEl.addEventListener('change', function () {
 });
 
 generateBtn.addEventListener('click', function () {
-  state.measures   = generateProgression(state.numMeasures, state.numOnsets, state.lockOnsets);
+  state.measures   = generateProgression(state.numMeasures, state.numOnsets, state.lockOnsets, state.keyIndex, state.lockKey);
   state.currentIdx = 0;
   showMeasure(0);
 });
@@ -674,6 +729,19 @@ beatRange.addEventListener('input', function () {
 
 lockBeatEl.addEventListener('change', function () {
   state.lockBeat = this.checked;
+});
+
+const keyRange  = document.getElementById('key-range');
+const keyValEl  = document.getElementById('key-val');
+const lockKeyEl = document.getElementById('lock-key');
+
+keyRange.addEventListener('input', function () {
+  state.keyIndex = parseInt(this.value);
+  keyValEl.textContent = KEYS[state.keyIndex].name;
+});
+
+lockKeyEl.addEventListener('change', function () {
+  state.lockKey = this.checked;
 });
 
 document.getElementById('mode-btn').addEventListener('click', function () {
