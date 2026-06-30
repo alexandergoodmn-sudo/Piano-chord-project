@@ -410,6 +410,13 @@ function randomOnsets(target) {
   return weightedRandom(target, 1, 8);
 }
 
+// Weighted random beat type centred on `baseDur` (used when beat lock is off)
+function randomBeatType(baseDur) {
+  const BEAT_DURATIONS = ['w','h','q','8','16'];
+  const idx = BEAT_DURATIONS.indexOf(baseDur);
+  return BEAT_DURATIONS[weightedRandom(idx === -1 ? 0 : idx, 0, 4)];
+}
+
 // Returns array-of-arrays: measures[m] = [chord, ...]
 // When lockOnsets is true every measure has exactly numOnsets chords.
 // When false each measure gets a random count weighted toward numOnsets.
@@ -486,14 +493,16 @@ function renderStaff(measureArr, duration, density) {
 
   function drawNotes(staveT, staveB, chords) {
     if (!chords || !chords.length) return;
-    const noteDur = state.lockOnsets ? dur : durationForOnsets(chords.length);
-    const tN = chords.map(c => {
+    const baseDur = state.lockOnsets ? dur : durationForOnsets(chords.length);
+    // Per-chord durations: uniform when beat is locked, randomly varied when unlocked
+    const chordDurs = chords.map(() => state.lockBeat ? baseDur : randomBeatType(baseDur));
+    const tN = chords.map((c, i) => {
       const d = state.lockDensity
         ? di
         : Math.min(Math.max(weightedRandom(state.chordDensity, 1, 5), 1), 5) - 1;
-      return new VF.StaveNote({ clef: 'treble', keys: c.v[d], duration: noteDur });
+      return new VF.StaveNote({ clef: 'treble', keys: c.v[d], duration: chordDurs[i] });
     });
-    const bN = chords.map(c => new VF.StaveNote({ clef: 'bass', keys: c.bass, duration: noteDur }));
+    const bN = chords.map((c, i) => new VF.StaveNote({ clef: 'bass', keys: c.bass, duration: chordDurs[i] }));
     VF.Formatter.FormatAndDraw(ctx, staveT, tN);
     VF.Formatter.FormatAndDraw(ctx, staveB, bN);
   }
