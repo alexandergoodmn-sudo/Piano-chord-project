@@ -428,6 +428,17 @@ html, body {
       <span class="slider-current" id="key-val">C</span>
     </div>
     <div class="slider-row">
+      <input type="checkbox" style="visibility:hidden; min-width:18px">
+      <span class="slider-name">Staff</span>
+      <div class="slider-wrap">
+        <input type="range" id="staff-range" min="0" max="2" step="1" value="1">
+        <div class="tick-row">
+          <span>Treble</span><span>Both</span><span>Bass</span>
+        </div>
+      </div>
+      <span class="slider-current" id="staff-val">Both</span>
+    </div>
+    <div class="slider-row">
       <input type="checkbox" id="lock-acc" title="Lock this value">
       <span class="slider-name">Keys</span>
       <div class="acc-row">
@@ -624,6 +635,7 @@ const state = {
   lockKey: false,
   noteAccidentals: { A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, G: 0 },
   lockAccidentals: false,
+  staffMode: 1, // 0 = treble only, 1 = both, 2 = bass only
   currentIdx: 0,
   measures: null, // array of arrays: [[chord,...], ...]
 };
@@ -659,13 +671,16 @@ function renderStaff(measureArr, duration, density) {
   container.innerHTML = '';
 
   const W = staffWidth();
-  const H = 210;
+  const singleStaff = state.staffMode !== 1;
+  const H = singleStaff ? 120 : 210;
   const TREBLE_Y = 5;
   const BASS_Y   = 88;
   const staveX = 16;
   const staveW = W - 20;
   const dur = duration || 'w';
   const di  = Math.min(Math.max((density || 3), 1), 5) - 1;
+
+  container.style.minHeight = (H - 38) + 'px';
 
   const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
   renderer.resize(W, H);
@@ -674,24 +689,26 @@ function renderStaff(measureArr, duration, density) {
 
   function drawNotes(staveT, staveB, chords) {
     if (!chords || !chords.length) return;
-    // Per-chord durations: X = equal random across all types; locked = exact; unlocked = weighted variety
     const chordDurs = chords.map(() => {
       if (dur === 'x') return BEAT_DURATIONS[Math.floor(Math.random() * BEAT_DURATIONS.length)];
       return state.lockBeat ? dur : randomBeatType(dur);
     });
-    const tN = chords.map((c, i) => {
-      const d = state.lockDensity
-        ? di
-        : Math.min(Math.max(weightedRandom(state.chordDensity, 1, 5), 1), 5) - 1;
-      // density 2: apply spread slider; locked = exact, unlocked = weighted variety
-      const keys = d === 1
-        ? c.v_alt[state.lockVoicing ? state.spreadIndex : weightedRandom(state.spreadIndex, 0, 3)]
-        : c.v[d];
-      return new VF.StaveNote({ clef: 'treble', keys: keys.map(applyAccidental), duration: chordDurs[i] });
-    });
-    const bN = chords.map((c, i) => new VF.StaveNote({ clef: 'bass', keys: c.bass.map(applyAccidental), duration: chordDurs[i] }));
-    VF.Formatter.FormatAndDraw(ctx, staveT, tN);
-    VF.Formatter.FormatAndDraw(ctx, staveB, bN);
+    if (staveT) {
+      const tN = chords.map((c, i) => {
+        const d = state.lockDensity
+          ? di
+          : Math.min(Math.max(weightedRandom(state.chordDensity, 1, 5), 1), 5) - 1;
+        const keys = d === 1
+          ? c.v_alt[state.lockVoicing ? state.spreadIndex : weightedRandom(state.spreadIndex, 0, 3)]
+          : c.v[d];
+        return new VF.StaveNote({ clef: 'treble', keys: keys.map(applyAccidental), duration: chordDurs[i] });
+      });
+      VF.Formatter.FormatAndDraw(ctx, staveT, tN);
+    }
+    if (staveB) {
+      const bN = chords.map((c, i) => new VF.StaveNote({ clef: 'bass', keys: c.bass.map(applyAccidental), duration: chordDurs[i] }));
+      VF.Formatter.FormatAndDraw(ctx, staveB, bN);
+    }
   }
 
   function connect(t, b, type) {
@@ -737,44 +754,69 @@ function renderStaff(measureArr, duration, density) {
     stave.addModifier(ks, 5); // 5 = StaveModifier.Position.BEGIN
   }
 
-  if (!twoUp) {
-    // ── Single measure ──
-    const treble = new VF.Stave(staveX, TREBLE_Y, staveW).addClef('treble').setContext(ctx);
-    addCustomKeySig(treble);
-    treble.draw();
-    const bass   = new VF.Stave(staveX, BASS_Y, staveW).addClef('bass').setContext(ctx);
-    addCustomKeySig(bass);
-    bass.draw();
-    connect(treble, bass, VF.StaveConnector.type.BRACE);
-    connect(treble, bass, VF.StaveConnector.type.SINGLE_LEFT);
-    connect(treble, bass, VF.StaveConnector.type.SINGLE_RIGHT);
-    if (measureArr && measureArr[0]) drawNotes(treble, bass, measureArr[0]);
+  if (singleStaff) {
+    const clef = state.staffMode === 0 ? 'treble' : 'bass';
+    if (!twoUp) {
+      // ── Single measure, single staff ──
+      const stave = new VF.Stave(staveX, TREBLE_Y, staveW).addClef(clef).setContext(ctx);
+      addCustomKeySig(stave);
+      stave.draw();
+      if (measureArr && measureArr[0]) {
+        drawNotes(state.staffMode === 0 ? stave : null, state.staffMode === 2 ? stave : null, measureArr[0]);
+      }
+    } else {
+      // ── Two measures side by side, single staff ──
+      const halfW = Math.floor(staveW / 2);
+      const NONE  = (VF.Barline && VF.Barline.type && VF.Barline.type.NONE) || 7;
+      const s1 = new VF.Stave(staveX, TREBLE_Y, halfW).addClef(clef).setContext(ctx);
+      addCustomKeySig(s1);
+      s1.draw();
+      const s2 = new VF.Stave(staveX + halfW, TREBLE_Y, halfW).setContext(ctx);
+      s2.setBegBarType(NONE);
+      s2.draw();
+      if (measureArr[0]) drawNotes(state.staffMode === 0 ? s1 : null, state.staffMode === 2 ? s1 : null, measureArr[0]);
+      if (measureArr[1]) drawNotes(state.staffMode === 0 ? s2 : null, state.staffMode === 2 ? s2 : null, measureArr[1]);
+    }
   } else {
-    // ── Two measures side by side ──
-    const halfW = Math.floor(staveW / 2);
-    const NONE  = (VF.Barline && VF.Barline.type && VF.Barline.type.NONE) || 7;
+    if (!twoUp) {
+      // ── Single measure, both staves ──
+      const treble = new VF.Stave(staveX, TREBLE_Y, staveW).addClef('treble').setContext(ctx);
+      addCustomKeySig(treble);
+      treble.draw();
+      const bass   = new VF.Stave(staveX, BASS_Y, staveW).addClef('bass').setContext(ctx);
+      addCustomKeySig(bass);
+      bass.draw();
+      connect(treble, bass, VF.StaveConnector.type.BRACE);
+      connect(treble, bass, VF.StaveConnector.type.SINGLE_LEFT);
+      connect(treble, bass, VF.StaveConnector.type.SINGLE_RIGHT);
+      if (measureArr && measureArr[0]) drawNotes(treble, bass, measureArr[0]);
+    } else {
+      // ── Two measures side by side, both staves ──
+      const halfW = Math.floor(staveW / 2);
+      const NONE  = (VF.Barline && VF.Barline.type && VF.Barline.type.NONE) || 7;
 
-    const t1 = new VF.Stave(staveX, TREBLE_Y, halfW).addClef('treble').setContext(ctx);
-    addCustomKeySig(t1);
-    t1.draw();
-    const b1 = new VF.Stave(staveX, BASS_Y, halfW).addClef('bass').setContext(ctx);
-    addCustomKeySig(b1);
-    b1.draw();
+      const t1 = new VF.Stave(staveX, TREBLE_Y, halfW).addClef('treble').setContext(ctx);
+      addCustomKeySig(t1);
+      t1.draw();
+      const b1 = new VF.Stave(staveX, BASS_Y, halfW).addClef('bass').setContext(ctx);
+      addCustomKeySig(b1);
+      b1.draw();
 
-    const t2 = new VF.Stave(staveX + halfW, TREBLE_Y, halfW).setContext(ctx);
-    t2.setBegBarType(NONE);
-    t2.draw();
-    const b2 = new VF.Stave(staveX + halfW, BASS_Y, halfW).setContext(ctx);
-    b2.setBegBarType(NONE);
-    b2.draw();
+      const t2 = new VF.Stave(staveX + halfW, TREBLE_Y, halfW).setContext(ctx);
+      t2.setBegBarType(NONE);
+      t2.draw();
+      const b2 = new VF.Stave(staveX + halfW, BASS_Y, halfW).setContext(ctx);
+      b2.setBegBarType(NONE);
+      b2.draw();
 
-    connect(t1, b1, VF.StaveConnector.type.BRACE);
-    connect(t1, b1, VF.StaveConnector.type.SINGLE_LEFT);
-    connect(t1, b1, VF.StaveConnector.type.SINGLE_RIGHT); // middle barline
-    connect(t2, b2, VF.StaveConnector.type.SINGLE_RIGHT); // final barline
+      connect(t1, b1, VF.StaveConnector.type.BRACE);
+      connect(t1, b1, VF.StaveConnector.type.SINGLE_LEFT);
+      connect(t1, b1, VF.StaveConnector.type.SINGLE_RIGHT);
+      connect(t2, b2, VF.StaveConnector.type.SINGLE_RIGHT);
 
-    if (measureArr[0]) drawNotes(t1, b1, measureArr[0]);
-    if (measureArr[1]) drawNotes(t2, b2, measureArr[1]);
+      if (measureArr[0]) drawNotes(t1, b1, measureArr[0]);
+      if (measureArr[1]) drawNotes(t2, b2, measureArr[1]);
+    }
   }
 
   // Trim dead space: VexFlow's internal offset pushes stave content ~38px below y=0.
@@ -927,6 +969,17 @@ keyRange.addEventListener('input', function () {
 
 lockKeyEl.addEventListener('change', function () {
   state.lockKey = this.checked;
+});
+
+const STAFF_LABELS = ['Treble', 'Both', 'Bass'];
+const staffRange   = document.getElementById('staff-range');
+const staffValEl   = document.getElementById('staff-val');
+
+staffRange.addEventListener('input', function () {
+  state.staffMode = parseInt(this.value);
+  staffValEl.textContent = STAFF_LABELS[state.staffMode];
+  if (state.measures) showMeasure(state.currentIdx);
+  else renderStaff(null);
 });
 
 const lockAccEl = document.getElementById('lock-acc');
