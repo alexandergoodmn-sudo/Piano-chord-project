@@ -336,6 +336,21 @@ html, body {
 
 /* ── Landscape/wide mode ── */
 #landscape-btn { min-width: 46px; font-size: 10px; }
+
+body.landscape {
+  overflow: hidden;
+}
+/* Rotate the entire app 90° CW, sized to fill the portrait viewport sideways */
+body.landscape #app {
+  position: fixed;
+  width: 100vh;
+  height: 100vw;
+  top: calc(50vh - 50vw);
+  left: calc(50vw - 50vh);
+  transform: rotate(90deg);
+  transform-origin: center center;
+  overflow: hidden;
+}
 body.landscape #slider-scroll { display: none; }
 </style>
 </head>
