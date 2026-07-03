@@ -421,6 +421,17 @@ body.landscape #slider-scroll { display: none; }
       <span class="slider-current" id="spread-val">5th</span>
     </div>
     <div class="slider-row">
+      <input type="checkbox" style="visibility:hidden; min-width:18px">
+      <span class="slider-name">Range</span>
+      <div class="slider-wrap">
+        <input type="range" id="note-range" min="0" max="4" step="1" value="4">
+        <div class="tick-row">
+          <span>Staff</span><span>+1</span><span>+2</span><span>+3</span><span>Any</span>
+        </div>
+      </div>
+      <span class="slider-current" id="note-range-val">Any</span>
+    </div>
+    <div class="slider-row">
       <input type="checkbox" id="lock-beat" title="Lock this value">
       <span class="slider-name">Beat type</span>
       <div class="slider-wrap">
@@ -657,6 +668,7 @@ const state = {
   lockAccidentals: false,
   staffMode: 1, // 0 = treble only, 1 = both, 2 = bass only
   landscapeMode: false,
+  noteRange: 4, // 0=staff only … 3=3 ledger lines, 4=any
   currentIdx: 0,
   measures: null, // array of arrays: [[chord,...], ...]
 };
@@ -679,6 +691,41 @@ function applyAccidental(vfNote) {
 // ────────────────────────────────────────────────────────────
 
 const VF = Vex.Flow;
+
+// ── Note range helpers ────────────────────────────────────────
+// Bounds: [lo, hi] MIDI values per range index per clef.
+// Treble staff: E4(64)–F5(77). Bass staff: G2(43)–A3(57).
+const TREBLE_BOUNDS = [[64,77],[62,79],[60,81],[57,84]];
+const BASS_BOUNDS   = [[43,57],[41,59],[40,60],[38,62]];
+const MIDI_SEMIS = {'c':0,'c#':1,'db':1,'d':2,'d#':3,'eb':3,'e':4,'e#':5,
+                    'f':5,'f#':6,'gb':6,'g':7,'g#':8,'ab':8,'a':9,'a#':10,'bb':10,'b':11,'cb':11};
+
+function noteToMidi(vfNote) {
+  const slash = vfNote.indexOf('/');
+  const semi  = MIDI_SEMIS[vfNote.slice(0, slash).toLowerCase()] || 0;
+  return (parseInt(vfNote.slice(slash + 1)) + 1) * 12 + semi;
+}
+
+function clampToRange(vfNote, clef) {
+  if (state.noteRange >= 4) return vfNote;
+  const [lo, hi] = (clef === 'bass' ? BASS_BOUNDS : TREBLE_BOUNDS)[state.noteRange];
+  const slash = vfNote.indexOf('/');
+  const name = vfNote.slice(0, slash);
+  let oct = parseInt(vfNote.slice(slash + 1));
+  let m = noteToMidi(vfNote);
+  if (m < lo) { while (m < lo) { m += 12; oct++; } if (m > hi) { m -= 12; oct--; } }
+  else if (m > hi) { while (m > hi) { m -= 12; oct--; } if (m < lo) { m += 12; oct++; } }
+  return name + '/' + oct;
+}
+
+function rangeKeys(keys, clef) {
+  if (state.noteRange >= 4) return keys;
+  const seen = new Set();
+  return keys
+    .map(n => clampToRange(n, clef))
+    .sort((a, b) => noteToMidi(a) - noteToMidi(b))
+    .filter(n => { const m = noteToMidi(n); if (seen.has(m)) return false; seen.add(m); return true; });
+}
 
 function staffWidth() {
   const el = document.getElementById('notation');
@@ -721,15 +768,20 @@ function renderStaff(measureArr, duration, density) {
         const d = state.lockDensity
           ? di
           : Math.min(Math.max(weightedRandom(state.chordDensity, 1, 5), 1), 5) - 1;
-        const keys = d === 1
+        const raw = (d === 1
           ? c.v_alt[state.lockVoicing ? state.spreadIndex : weightedRandom(state.spreadIndex, 0, 3)]
-          : c.v[d];
-        return new VF.StaveNote({ clef: 'treble', keys: keys.map(applyAccidental), duration: chordDurs[i] });
+          : c.v[d]).map(applyAccidental);
+        const keys = rangeKeys(raw, 'treble');
+        return new VF.StaveNote({ clef: 'treble', keys: keys.length ? keys : raw.slice(0, 1), duration: chordDurs[i] });
       });
       VF.Formatter.FormatAndDraw(ctx, staveT, tN);
     }
     if (staveB) {
-      const bN = chords.map((c, i) => new VF.StaveNote({ clef: 'bass', keys: c.bass.map(applyAccidental), duration: chordDurs[i] }));
+      const bN = chords.map((c, i) => {
+        const raw  = c.bass.map(applyAccidental);
+        const keys = rangeKeys(raw, 'bass');
+        return new VF.StaveNote({ clef: 'bass', keys: keys.length ? keys : raw.slice(0, 1), duration: chordDurs[i] });
+      });
       VF.Formatter.FormatAndDraw(ctx, staveB, bN);
     }
   }
@@ -938,6 +990,17 @@ spreadRange.addEventListener('input', function () {
 
 lockVoicingEl.addEventListener('change', function () {
   state.lockVoicing = this.checked;
+});
+
+const RANGE_LABELS  = ['Staff', '+1', '+2', '+3', 'Any'];
+const noteRangeEl   = document.getElementById('note-range');
+const noteRangeValEl = document.getElementById('note-range-val');
+
+noteRangeEl.addEventListener('input', function () {
+  state.noteRange = parseInt(this.value);
+  noteRangeValEl.textContent = RANGE_LABELS[state.noteRange];
+  if (state.measures) showMeasure(state.currentIdx);
+  else renderStaff(null);
 });
 
 const BEAT_DURATIONS = ['w','h','q','8','16'];
