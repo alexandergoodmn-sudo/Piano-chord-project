@@ -413,12 +413,12 @@ body.landscape #slider-scroll { display: none; }
       <input type="checkbox" id="lock-voicing" title="Lock this value">
       <span class="slider-name">Spread</span>
       <div class="slider-wrap">
-        <input type="range" id="spread-range" min="0" max="3" step="1" value="2">
+        <input type="range" id="spread-range" min="0" max="6" step="1" value="3">
         <div class="tick-row">
-          <span>3rd</span><span>4th</span><span>5th</span><span>6th</span>
+          <span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span>
         </div>
       </div>
-      <span class="slider-current" id="spread-val">5th</span>
+      <span class="slider-current" id="spread-val">5</span>
     </div>
     <div class="slider-row">
       <input type="checkbox" style="visibility:hidden; min-width:18px">
@@ -656,7 +656,7 @@ const state = {
   numOnsets: 1,
   chordDensity: 3,
   lockDensity: false,
-  spreadIndex: 2,
+  spreadIndex: 3,
   lockVoicing: false,
   beatType: 'w',
   lockBeat: false,
@@ -768,9 +768,19 @@ function renderStaff(measureArr, duration, density) {
         const d = state.lockDensity
           ? di
           : Math.min(Math.max(weightedRandom(state.chordDensity, 1, 5), 1), 5) - 1;
-        const raw = (d === 1
-          ? c.v_alt[state.lockVoicing ? state.spreadIndex : weightedRandom(state.spreadIndex, 0, 3)]
-          : c.v[d]).map(applyAccidental);
+        let rawVoicing;
+        if (d === 1) {
+          // Density 2: root + chosen interval above
+          const SPREAD_SEMIS = [2, 4, 5, 7, 9, 11, 12]; // maj2, maj3, p4, p5, maj6, maj7, oct
+          const si   = state.lockVoicing ? state.spreadIndex : weightedRandom(state.spreadIndex, 0, 6);
+          const semi = SPREAD_SEMIS[Math.min(si, 6)];
+          const root = c.v[0][0];
+          const useFl = state.keyIndex < 12 ? KEYS[state.keyIndex].flats : false;
+          rawVoicing = [root, transposeNote(root, semi, useFl)];
+        } else {
+          rawVoicing = c.v[d];
+        }
+        const raw = rawVoicing.map(applyAccidental);
         const keys = rangeKeys(raw, 'treble');
         return new VF.StaveNote({ clef: 'treble', keys: keys.length ? keys : raw.slice(0, 1), duration: chordDurs[i] });
       });
@@ -977,7 +987,7 @@ lockDensityEl.addEventListener('change', function () {
   state.lockDensity = this.checked;
 });
 
-const SPREAD_LABELS = ['3rd', '4th', '5th', '6th'];
+const SPREAD_LABELS = ['2', '3', '4', '5', '6', '7', '8'];
 const spreadRange   = document.getElementById('spread-range');
 const spreadValEl   = document.getElementById('spread-val');
 const lockVoicingEl = document.getElementById('lock-voicing');
@@ -986,6 +996,7 @@ spreadRange.addEventListener('input', function () {
   state.spreadIndex = parseInt(this.value);
   spreadValEl.textContent = SPREAD_LABELS[state.spreadIndex];
   if (state.measures) showMeasure(state.currentIdx);
+  else renderStaff(null);
 });
 
 lockVoicingEl.addEventListener('change', function () {
@@ -1119,10 +1130,10 @@ document.getElementById('genre-normal').addEventListener('click', function () {
   state.chordDensity = 2;
   densityValEl.textContent = '2';
 
-  // Spread → 5th (index 2)
-  spreadRange.value = 2;
-  state.spreadIndex = 2;
-  spreadValEl.textContent = '5th';
+  // Spread → 5th (index 3 in new 7-interval array)
+  spreadRange.value = 3;
+  state.spreadIndex = 3;
+  spreadValEl.textContent = '5';
 
   // Beat type → quarter note (index 2)
   beatRange.value = 2;
