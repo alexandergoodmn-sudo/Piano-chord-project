@@ -333,6 +333,7 @@ html, body {
 .acc-btn.sharp { background: #111; color: #fff; border-color: #111; }
 .acc-btn.flat  { background: #555; color: #fff; border-color: #555; }
 .acc-btn:active { opacity: 0.7; }
+.acc-btn.c-on { background: #d00; color: #fff; border-color: #d00; }
 
 /* ── Landscape/wide mode ── */
 #landscape-btn { min-width: 46px; font-size: 10px; }
@@ -468,6 +469,13 @@ body.landscape #slider-scroll { display: none; }
         </div>
       </div>
       <span class="slider-current" id="staff-val">Both</span>
+    </div>
+    <div class="slider-row">
+      <input type="checkbox" style="visibility:hidden; min-width:18px">
+      <span class="slider-name">Red C</span>
+      <div class="acc-row">
+        <button class="acc-btn" id="highlight-c-btn">Off</button>
+      </div>
     </div>
     <div class="slider-row">
       <input type="checkbox" id="lock-acc" title="Lock this value">
@@ -669,6 +677,7 @@ const state = {
   staffMode: 1, // 0 = treble only, 1 = both, 2 = bass only
   landscapeMode: false,
   noteRange: 4, // 0=staff only … 3=3 ledger lines, 4=any
+  highlightC: false, // red C lines (ledger) and half-transparent red C spaces
   currentIdx: 0,
   measures: null, // array of arrays: [[chord,...], ...]
 };
@@ -734,6 +743,76 @@ function staffWidth() {
   const base = Math.min(viewW, 330);
   return (state.numMeasures === 4 || state.numMeasures === 8) ? Math.round(base * 0.86) : base;
 }
+
+// ── Red C highlighting ───────────────────────────────────────
+const C_RED      = '#d00';
+const C_SPACE_RED = 'rgba(221, 0, 0, 0.35)';
+// VexFlow note-line numbers (bottom staff line = 1, top = 5) where C sits on a line;
+// all C lines/spaces repeat every 3.5 note-lines (one octave).
+const C_LINE_BASE = { treble: 0, bass: -1 };  // treble: C4/C6…, bass: C2/C4…
+const C_SPACE     = { treble: 3.5, bass: 2.5 }; // C5 in treble, C3 in bass
+
+function isCLine(clef, line) {
+  const base = C_LINE_BASE[clef];
+  return base !== undefined && (((line - base) % 7) + 7) % 7 === 0;
+}
+
+// Fills the C space inside the stave with half-transparent red.
+function fillCSpace(ctx, stave, clef) {
+  const sp = C_SPACE[clef];
+  const y1 = stave.getYForNote(sp + 0.5);
+  const y2 = stave.getYForNote(sp - 0.5);
+  ctx.save();
+  ctx.setFillStyle(C_SPACE_RED);
+  ctx.fillRect(stave.getX(), Math.min(y1, y2), stave.getWidth(), Math.abs(y2 - y1));
+  ctx.restore();
+}
+
+// After VexFlow draws a note's ledger lines, redraw any that fall on a C in red.
+(function patchLedgerLines() {
+  const orig = VF.StaveNote.prototype.drawLedgerLines;
+  VF.StaveNote.prototype.drawLedgerLines = function () {
+    orig.call(this);
+    if (!state.highlightC || this.isRest()) return;
+    const ctx = this.context;
+    const stave = this.stave;
+    const strokePx = this.render_options.stroke_px;
+    const width = this.glyph.getWidth() + strokePx * 2;
+    const doubleWidth = 2 * (this.glyph.getWidth() + strokePx) - (VF.Stem.WIDTH / 2);
+    const b = this.getNoteHeadBounds();
+    const minX = Math.min(b.displaced_x, b.non_displaced_x);
+    const clef = this.clef;
+
+    function redLine(line, normal, displaced) {
+      if (!isCLine(clef, line) || (!normal && !displaced)) return;
+      let x;
+      if (displaced && normal) x = minX - strokePx;
+      else if (normal) x = b.non_displaced_x - strokePx;
+      else x = b.displaced_x - strokePx;
+      const w = (normal && displaced) ? doubleWidth : width;
+      const y = stave.getYForNote(line);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + w, y);
+      ctx.stroke();
+    }
+
+    ctx.save();
+    ctx.setStrokeStyle(C_RED);
+    ctx.setLineWidth(1.6);
+    for (let line = 6; line <= b.highest_line; ++line) {
+      redLine(line,
+        b.non_displaced_x !== null && line <= b.highest_non_displaced_line,
+        b.displaced_x !== null && line <= b.highest_displaced_line);
+    }
+    for (let line = 0; line >= b.lowest_line; --line) {
+      redLine(line,
+        b.non_displaced_x !== null && line >= b.lowest_non_displaced_line,
+        b.displaced_x !== null && line >= b.lowest_displaced_line);
+    }
+    ctx.restore();
+  };
+})();
 
 // measureArr: array of 1 or 2 chord-arrays (one per measure).
 function renderStaff(measureArr, duration, density) {
@@ -850,6 +929,7 @@ function renderStaff(measureArr, duration, density) {
       if (i === 0) { s.addClef(clef); addCustomKeySig(s); }
       else s.setBegBarType(NONE);
       s.draw();
+      if (state.highlightC) fillCSpace(ctx, s, clef);
       staves.push(s);
     }
     for (let i = 0; i < numUp; i++) {
@@ -870,6 +950,7 @@ function renderStaff(measureArr, duration, density) {
       if (i === 0) { t.addClef('treble'); b.addClef('bass'); addCustomKeySig(t); addCustomKeySig(b); }
       else { t.setBegBarType(NONE); b.setBegBarType(NONE); }
       t.draw(); b.draw();
+      if (state.highlightC) { fillCSpace(ctx, t, 'treble'); fillCSpace(ctx, b, 'bass'); }
       trebles.push(t); basses.push(b);
     }
     connect(trebles[0], basses[0], VF.StaveConnector.type.BRACE);
@@ -1060,13 +1141,21 @@ staffRange.addEventListener('input', function () {
   else renderStaff(null);
 });
 
+document.getElementById('highlight-c-btn').addEventListener('click', function () {
+  state.highlightC = !state.highlightC;
+  this.textContent = state.highlightC ? 'On' : 'Off';
+  this.classList.toggle('c-on', state.highlightC);
+  if (state.measures) showMeasure(state.currentIdx);
+  else renderStaff(null);
+});
+
 const lockAccEl = document.getElementById('lock-acc');
 
 lockAccEl.addEventListener('change', function () {
   state.lockAccidentals = this.checked;
 });
 
-document.querySelectorAll('.acc-btn').forEach(function (btn) {
+document.querySelectorAll('.acc-btn[data-note]').forEach(function (btn) {
   btn.addEventListener('click', function () {
     const note = this.dataset.note;
     const cur  = state.noteAccidentals[note];
