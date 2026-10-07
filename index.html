@@ -762,8 +762,8 @@ function isCLine(clef, line) {
 
 const MIDDLE_C_LINE = { treble: 0, bass: 6 }; // first ledger line below / above
 
-// Draws a full-width red "6th line" where middle C sits and, in All mode,
-// fills the C space inside the stave with half-transparent red.
+// Draws a full-width "6th line" where middle C sits (black in Mid C mode, red in
+// All mode) and, in All mode, fills the C space inside the stave with half-transparent red.
 function drawCMarks(ctx, stave, clef) {
   const yMid = stave.getYForNote(MIDDLE_C_LINE[clef]);
   ctx.save();
@@ -774,7 +774,7 @@ function drawCMarks(ctx, stave, clef) {
     ctx.setFillStyle(C_SPACE_RED);
     ctx.fillRect(stave.getX(), Math.min(y1, y2), stave.getWidth(), Math.abs(y2 - y1));
   }
-  ctx.setStrokeStyle(C_RED);
+  ctx.setStrokeStyle(state.redCMode === 2 ? C_RED : '#000');
   ctx.setLineWidth(1.6);
   ctx.beginPath();
   ctx.moveTo(stave.getX(), yMid);
@@ -783,12 +783,13 @@ function drawCMarks(ctx, stave, clef) {
   ctx.restore();
 }
 
-// After VexFlow draws a note's ledger lines, redraw any that fall on a C in red.
+// After VexFlow draws a note's ledger lines, redraw any that fall on a C in red
+// (All mode), or just the middle C one in black (Mid C mode) so it matches the long line.
 (function patchLedgerLines() {
   const orig = VF.StaveNote.prototype.drawLedgerLines;
   VF.StaveNote.prototype.drawLedgerLines = function () {
     orig.call(this);
-    if (state.redCMode !== 2 || this.isRest()) return;
+    if (!state.redCMode || this.isRest()) return;
     const ctx = this.context;
     const stave = this.stave;
     const strokePx = this.render_options.stroke_px;
@@ -800,6 +801,7 @@ function drawCMarks(ctx, stave, clef) {
 
     function redLine(line, normal, displaced) {
       if (!isCLine(clef, line) || (!normal && !displaced)) return;
+      if (state.redCMode === 1 && line !== MIDDLE_C_LINE[clef]) return;
       let x;
       if (displaced && normal) x = minX - strokePx;
       else if (normal) x = b.non_displaced_x - strokePx;
@@ -813,7 +815,7 @@ function drawCMarks(ctx, stave, clef) {
     }
 
     ctx.save();
-    ctx.setStrokeStyle(C_RED);
+    ctx.setStrokeStyle(state.redCMode === 2 ? C_RED : '#000');
     ctx.setLineWidth(1.6);
     for (let line = 6; line <= b.highest_line; ++line) {
       redLine(line,
