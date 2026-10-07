@@ -761,9 +761,11 @@ function isCLine(clef, line) {
 }
 
 const MIDDLE_C_LINE = { treble: 0, bass: 6 }; // first ledger line below / above
+const HIGH_C_LINE   = 7; // treble C6: 2nd ledger line above the staff (next C above FACE's C)
 
 // Draws a full-width "6th line" where middle C sits (black in Mid C mode, red in
-// All mode) and, in All mode, fills the C space inside the stave with half-transparent red.
+// All mode). In All mode it also fills the C space inside the stave with half-transparent
+// red and, on the treble staff, draws a full-width red line at the next C up (C6).
 function drawCMarks(ctx, stave, clef) {
   const yMid = stave.getYForNote(MIDDLE_C_LINE[clef]);
   ctx.save();
@@ -779,6 +781,11 @@ function drawCMarks(ctx, stave, clef) {
   ctx.beginPath();
   ctx.moveTo(stave.getX(), yMid);
   ctx.lineTo(stave.getX() + stave.getWidth(), yMid);
+  if (state.redCMode === 2 && clef === 'treble') {
+    const yHigh = stave.getYForNote(HIGH_C_LINE);
+    ctx.moveTo(stave.getX(), yHigh);
+    ctx.lineTo(stave.getX() + stave.getWidth(), yHigh);
+  }
   ctx.stroke();
   ctx.restore();
 }
@@ -984,8 +991,10 @@ function renderStaff(measureArr, duration, density) {
 
   // Trim dead space: VexFlow's internal offset pushes stave content ~38px below y=0.
   // Shift the viewBox up so the staff fills from the top of the SVG element.
-  // Bass-only with Red C: leave room for the middle-C line above the staff.
-  const TOP_TRIM = (state.redCMode && state.staffMode === 2) ? 28 : 38;
+  // Red C lines above the staff need extra room at the top, so the whole staff moves down:
+  // treble + All mode shows the high C line (C6); bass-only shows the middle-C line.
+  const TOP_TRIM = (state.redCMode === 2 && state.staffMode !== 2) ? 18
+                 : (state.redCMode && state.staffMode === 2) ? 28 : 38;
   const SHOW_H   = H - TOP_TRIM;
   const svg = container.querySelector('svg');
   svg.setAttribute('viewBox', `0 ${TOP_TRIM} ${W} ${SHOW_H}`);
