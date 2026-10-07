@@ -757,14 +757,24 @@ function isCLine(clef, line) {
   return base !== undefined && (((line - base) % 7) + 7) % 7 === 0;
 }
 
-// Fills the C space inside the stave with half-transparent red.
-function fillCSpace(ctx, stave, clef) {
+const MIDDLE_C_LINE = { treble: 0, bass: 6 }; // first ledger line below / above
+
+// Fills the C space inside the stave with half-transparent red and draws
+// a full-width red "6th line" where middle C sits.
+function drawCMarks(ctx, stave, clef) {
   const sp = C_SPACE[clef];
   const y1 = stave.getYForNote(sp + 0.5);
   const y2 = stave.getYForNote(sp - 0.5);
+  const yMid = stave.getYForNote(MIDDLE_C_LINE[clef]);
   ctx.save();
   ctx.setFillStyle(C_SPACE_RED);
   ctx.fillRect(stave.getX(), Math.min(y1, y2), stave.getWidth(), Math.abs(y2 - y1));
+  ctx.setStrokeStyle(C_RED);
+  ctx.setLineWidth(1.6);
+  ctx.beginPath();
+  ctx.moveTo(stave.getX(), yMid);
+  ctx.lineTo(stave.getX() + stave.getWidth(), yMid);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -929,7 +939,7 @@ function renderStaff(measureArr, duration, density) {
       if (i === 0) { s.addClef(clef); addCustomKeySig(s); }
       else s.setBegBarType(NONE);
       s.draw();
-      if (state.highlightC) fillCSpace(ctx, s, clef);
+      if (state.highlightC) drawCMarks(ctx, s, clef);
       staves.push(s);
     }
     for (let i = 0; i < numUp; i++) {
@@ -950,7 +960,7 @@ function renderStaff(measureArr, duration, density) {
       if (i === 0) { t.addClef('treble'); b.addClef('bass'); addCustomKeySig(t); addCustomKeySig(b); }
       else { t.setBegBarType(NONE); b.setBegBarType(NONE); }
       t.draw(); b.draw();
-      if (state.highlightC) { fillCSpace(ctx, t, 'treble'); fillCSpace(ctx, b, 'bass'); }
+      if (state.highlightC) { drawCMarks(ctx, t, 'treble'); drawCMarks(ctx, b, 'bass'); }
       trebles.push(t); basses.push(b);
     }
     connect(trebles[0], basses[0], VF.StaveConnector.type.BRACE);
@@ -967,7 +977,8 @@ function renderStaff(measureArr, duration, density) {
 
   // Trim dead space: VexFlow's internal offset pushes stave content ~38px below y=0.
   // Shift the viewBox up so the staff fills from the top of the SVG element.
-  const TOP_TRIM = 38;
+  // Bass-only with Red C: leave room for the middle-C line above the staff.
+  const TOP_TRIM = (state.highlightC && state.staffMode === 2) ? 28 : 38;
   const SHOW_H   = H - TOP_TRIM;
   const svg = container.querySelector('svg');
   svg.setAttribute('viewBox', `0 ${TOP_TRIM} ${W} ${SHOW_H}`);
